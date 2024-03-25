@@ -12,7 +12,7 @@ import random
 
 base_path = '/home/madse/Downloads/Fluxnet_Data/'
 site_info = pd.read_csv("/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv")
-maxiter = 100 # TODO: maxiter should be 100-1000
+maxiter = 100 # TODO:  maxiter should be 100-1000
 opt_method = 'deap'
 
 # TODO: ll flux tower NEE data was u-star filtered using site-specific thresholds determined 
