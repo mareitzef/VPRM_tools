@@ -29,22 +29,17 @@ def VPRM_for_timeseries(Tmin,Tmax,Topt,PAR0,alpha,beta,lambd,T2M,LSWI,LSWI_max,E
     EVI_min = min(EVI)
     EVI_max = min(EVI)
 
-    # Tscale = [
-    #     (
-    #         ((t - Tmin) * (t - Tmax))
-    #         / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2)
-    #         if ((t - Tmin) * (t - Tmax) > 0) and ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2) != 0
-    #         else 0.0
-    #     )
-    #     for t in T2M
-    # ]
-    Tscale = [
-        (
-            ((t - Tmin) * (t - Tmax))
-            / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2)
-        )
-        for t in T2M
-    ]
+    Tscale = []
+    for t in T2M:
+        numerator = (t - Tmin) * (t - Tmax)
+        denominator = (t - Tmin) * (t - Tmax) - (t - Topt) ** 2
+        
+        if numerator > 0 and denominator != 0:
+            scale = numerator / denominator
+        else:
+            scale = 0.0
+        
+        Tscale.append(scale)
 
 
     if VEGTYP == 4 or VEGTYP == 7:
