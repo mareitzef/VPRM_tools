@@ -4,11 +4,9 @@ from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from VPRM_for_timeseries import VPRM_for_timeseries
-from scipy.optimize import minimize
+from scipy.optimize import minimize, differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
-from deap import base, creator, tools, algorithms
-import deap.creator
-import random
+
 
 ############################## base settings #############################################
 
@@ -16,8 +14,9 @@ base_path = "/home/madse/Downloads/Fluxnet_Data/"
 site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
-maxiter = 5  # TODO:  maxiter should be 50-1000 of for deap Number of generations (default=100).
-opt_method = "minimize"  # "minimize","deap"
+maxiter = 10  # (default=100 takes ages)
+opt_method = "diff_evo"  # "minimize","diff_evo"
+
 
 # TODO: ll flux tower NEE data was u-star filtered using site-specific thresholds determined
 # visually by plotting averaged nighttime NEE along binned u-star intervals (Barr et al., 2013).
@@ -310,174 +309,50 @@ for folder in flx_folders:
                 objective_function_VPRM, initial_guess, bounds=bounds, options=options
             )
             optimized_params = result.x
-            # Calculate model predictions with optimized parameters
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
-                *optimized_params,
-                T2M,
-                LSWI,
-                LSWI_min,
-                LSWI_max,
-                EVI,
-                PAR,
-                VEGTYP,
-                VEGFRA
+        elif opt_method == "diff_evo":
+            result = differential_evolution(
+                objective_function_VPRM,
+                bounds,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
             )
-            # Calculate R²
-            R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
-            R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
-            R2_NEE = r2_score(
+            optimized_params = result.x
+        else:
+            print("ERROR you have to choose an optimization Method")
+
+        # Calculate model predictions with optimized parameters
+        GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
+            *optimized_params, T2M, LSWI, LSWI_min, LSWI_max, EVI, PAR, VEGTYP, VEGFRA
+        )
+        # Calculate R²
+        R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
+        R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
+        R2_NEE = r2_score(
+            df_year[nee],
+            np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
+        )
+        # Calculate other measures
+        # root mean squared error
+        rmse_GPP = np.sqrt(
+            mean_squared_error(df_year[gpp], np.array(GPP_VPRM_optimized))
+        )
+        rmse_Reco = np.sqrt(
+            mean_squared_error(df_year[r_eco], np.array(Reco_VPRM_optimized))
+        )
+        rmse_NEE = np.sqrt(
+            mean_squared_error(
                 df_year[nee],
                 np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
             )
-            # Calculate other measures
-            # root mean squared error
-            rmse_GPP = np.sqrt(
-                mean_squared_error(df_year[gpp], np.array(GPP_VPRM_optimized))
-            )
-            rmse_Reco = np.sqrt(
-                mean_squared_error(df_year[r_eco], np.array(Reco_VPRM_optimized))
-            )
-            rmse_NEE = np.sqrt(
-                mean_squared_error(
-                    df_year[nee],
-                    np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
-                )
-            )
-            percent_of_sum = sum(
-                np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
-            ) / sum(df_year[nee])
-
-        elif opt_method == "deap":
-            # Define the evaluation function
-            def objective_function_VPRM(individual):
-                Tmin, Tmax, Topt, PAR0, alpha, beta, lambd = individual
-                GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
-                    Tmin,
-                    Tmax,
-                    Topt,
-                    PAR0,
-                    alpha,
-                    beta,
-                    lambd,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                    PAR,
-                    VEGTYP,
-                    VEGFRA,
-                )
-                residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
-                    nee
-                ]
-                return (np.sum(residuals_NEE**2),)  # Return as tuple
-
-            # Create the DEAP types
-            # creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-            # creator.create("Individual", list, fitness=creator.FitnessMin)
-
-            if not hasattr(deap.creator, "FitnessMin"):
-                deap.creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-
-            if not hasattr(deap.creator, "Individual"):
-                deap.creator.create("Individual", list, fitness=deap.creator.FitnessMin)
-
-            # Initialize the DEAP toolbox
-            toolbox = base.Toolbox()
-            # Register the evaluation function
-            toolbox.register("evaluate", objective_function_VPRM)
-            # Define the range for each parameter
-            toolbox.register("attr_float", random.uniform, -10, 10)  # Range for Tmin
-            toolbox.register("attr_float", random.uniform, 30, 50)  # Range for Tmax
-            toolbox.register("attr_float", random.uniform, 0, 50)  # Range for Topt
-            toolbox.register("attr_float", random.uniform, 0, 6000)  # Range for PAR0
-            toolbox.register("attr_float", random.uniform, 0, 5)  # Range for alpha
-            toolbox.register("attr_float", random.uniform, -3, 6)  # Range for beta
-            toolbox.register("attr_float", random.uniform, 0, 1)  # Range for lambd
-            # Define the individual (parameter set) as a list of floats
-            toolbox.register(
-                "individual",
-                tools.initCycle,
-                creator.Individual,
-                (toolbox.attr_float,) * 7,
-                n=1,
-            )
-            # Define the population as a list of individuals
-            toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-            # Define the mating, mutation, and selection operators
-            toolbox.register("mate", tools.cxBlend, alpha=0.5)  # Blend crossover
-            toolbox.register(
-                "mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2
-            )  # Gaussian mutation
-            toolbox.register("select", tools.selTournament, tournsize=3)
-            # Set the algorithm parameters
-            NGEN = maxiter  # Number of generations, should be 100
-            MU = 50  # Population size
-            CXPB = 0.7  # Crossover probability
-            MUTPB = 0.2  # Mutation probability
-            # Create an initial population
-            pop = toolbox.population(n=MU)
-            # Evaluate the entire population
-            fitnesses = list(map(toolbox.evaluate, pop))
-            for ind, fit in zip(pop, fitnesses):
-                ind.fitness.values = fit
-            # Begin the evolution
-            for gen in range(NGEN):
-                print(gen)
-                # Select the next generation individuals
-                offspring = algorithms.varAnd(pop, toolbox, cxpb=CXPB, mutpb=MUTPB)
-                # Evaluate the offspring
-                fits = toolbox.map(toolbox.evaluate, offspring)
-                for ind, fit in zip(offspring, fits):
-                    ind.fitness.values = fit
-                # Select the next generation
-                pop = toolbox.select(offspring + pop, k=MU)
-
-            # Retrieve the best individual
-            optimized_params = tools.selBest(pop, k=1)[0]
-
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
-                *optimized_params,
-                T2M,
-                LSWI,
-                LSWI_min,
-                LSWI_max,
-                EVI,
-                PAR,
-                VEGTYP,
-                VEGFRA
-            )
-            # Calculate R²
-            R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
-            R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
-            R2_NEE = r2_score(
-                df_year[nee],
-                np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
-            )
-            # Calculate other measures
-            # root mean squared error
-            rmse_GPP = np.sqrt(
-                mean_squared_error(df_year[gpp], np.array(GPP_VPRM_optimized))
-            )
-            rmse_Reco = np.sqrt(
-                mean_squared_error(df_year[r_eco], np.array(Reco_VPRM_optimized))
-            )
-            rmse_NEE = np.sqrt(
-                mean_squared_error(
-                    df_year[nee],
-                    np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
-                )
-            )
-            percent_of_sum = sum(
-                np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
-            ) / sum(df_year[nee])
+        )
+        percent_of_sum = sum(
+            np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
+        ) / sum(df_year[nee])
 
         data_to_append = pd.DataFrame(
             {
                 "site_ID": [site_name],
                 "PFT": [target_pft],
-                "method": [opt_method],
                 "Year": [year],
                 "Tmin_opt": [optimized_params[0]],
                 "Tmax_opt": [optimized_params[1]],
@@ -514,7 +389,9 @@ for folder in flx_folders:
         + site_name
         + "_"
         + target_pft
-        + "_optimized_params_maxiter_"
+        + "_optimized_params_"
+        + opt_method
+        + "_"
         + str(maxiter)
         + ".xlsx",
         index=False,
@@ -768,6 +645,8 @@ for folder in flx_folders:
             + str(year)
             + "_"
             + str(opt_method)
+            + "_"
+            + str(maxiter)
             + ".png"
         )
 
@@ -775,5 +654,6 @@ for folder in flx_folders:
         # plt.show()
 
 optimized_params_df_all.to_excel(
-    base_path + "all_optimized_params_maxiter_" + str(maxiter) + ".xlsx", index=False
+    base_path + "all_optimized_params_" + opt_method + "_" + str(maxiter) + ".xlsx",
+    index=False,
 )

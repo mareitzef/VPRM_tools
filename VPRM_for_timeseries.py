@@ -41,19 +41,20 @@ def VPRM_for_timeseries(
     EVI_min = min(EVI)
     EVI_max = min(EVI)
 
-    # TODO: Tscale = [
-    #     (
-    #         ((t - Tmin) * (t - Tmax))
-    #         / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2)
-    #         if ((t - Tmin) * (t - Tmax) > 0) and ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2) != 0
-    #         else 0.0
-    #     )
+    Tscale = []
+    for i in range(len(T2M)):
+        a1 = T2M[i] - Tmin
+        a2 = T2M[i] - Tmax
+        a3 = T2M[i] - Topt
+        if a1 < 0 or a2 > 0:
+            Tscale.append(0)
+        else:
+            Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
+
+    # Tscale = [
+    #     (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
     #     for t in T2M
     # ]
-    Tscale = [
-        (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
-        for t in T2M
-    ]
 
     Wscale = []
     for i in range(len(LSWI)):
@@ -124,21 +125,15 @@ def VPRM_new_for_timeseries(
     EVI_min = min(EVI)
     EVI_max = max(EVI)
 
-    # Tscale = []
-    # for t in T2M:
-    #     numerator = (t - Tmin) * (t - Tmax)
-    #     denominator = (t - Tmin) * (t - Tmax) - (t - Topt) ** 2
-
-    #     if numerator > 0 and denominator != 0:
-    #         scale = numerator / denominator
-    #     else:
-    #         scale = 0.0
-
-    #     Tscale.append(scale)
-    Tscale = [
-        (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
-        for t in T2M
-    ]
+    Tscale = []
+    for i in range(len(T2M)):
+        a1 = T2M[i] - Tmin
+        a2 = T2M[i] - Tmax
+        a3 = T2M[i] - Topt
+        if a1 < 0 or a2 > 0:
+            Tscale.append(0)
+        else:
+            Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
 
     Wscale = []
     for i in range(len(LSWI)):
