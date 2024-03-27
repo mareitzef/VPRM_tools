@@ -41,20 +41,22 @@ def VPRM_for_timeseries(
     EVI_min = min(EVI)
     EVI_max = min(EVI)
 
-    Tscale = []
-    for i in range(len(T2M)):
-        a1 = T2M[i] - Tmin
-        a2 = T2M[i] - Tmax
-        a3 = T2M[i] - Topt
-        if a1 < 0 or a2 > 0:
-            Tscale.append(0)
-        else:
-            Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
+    # Tscale = []
+    # for i in range(len(T2M)):
+    #     a1 = T2M[i] - Tmin
+    #     a2 = T2M[i] - Tmax
+    #     a3 = T2M[i] - Topt
+    #     if a1 < 0 or a2 > 0:
+    #         Tscale.append(0)
+    #     elif a1 * a2 - a3**2 <= 0:
+    #         Tscale.append(0)
+    #     else:
+    #         Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
 
-    # Tscale = [
-    #     (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
-    #     for t in T2M
-    # ]
+    Tscale = [
+        (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
+        for t in T2M
+    ]
 
     Wscale = []
     for i in range(len(LSWI)):
@@ -125,15 +127,21 @@ def VPRM_new_for_timeseries(
     EVI_min = min(EVI)
     EVI_max = max(EVI)
 
-    Tscale = []
-    for i in range(len(T2M)):
-        a1 = T2M[i] - Tmin
-        a2 = T2M[i] - Tmax
-        a3 = T2M[i] - Topt
-        if a1 < 0 or a2 > 0:
-            Tscale.append(0)
-        else:
-            Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
+    # Tscale = []
+    # for t in T2M:
+    #     a1 = t - Tmin
+    #     a2 = t - Tmax
+    #     a3 = t - Topt
+
+    #     if a1 <= 0 or a2 >= 0 or a1 * a2 - a3**2 <= 0:
+    #         Tscale.append(0)
+    #     else:
+    #         Tscale.append(max(0, a1 * a2 / (a1 * a2 - a3**2)))
+
+    Tscale = [
+        (((t - Tmin) * (t - Tmax)) / ((t - Tmin) * (t - Tmax) - (t - Topt) ** 2))
+        for t in T2M
+    ]
 
     Wscale = []
     for i in range(len(LSWI)):

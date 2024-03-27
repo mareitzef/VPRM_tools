@@ -3,10 +3,10 @@ import os
 from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
-from VPRM_for_timeseries import VPRM_for_timeseries
 from scipy.optimize import minimize, differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
-
+from VPRM_for_timeseries import VPRM_for_timeseries, VPRM_new_for_timeseries
+from plot_measured_vs_optimized_VPRM import plot_measured_vs_optimized_VPRM
 
 ############################## base settings #############################################
 
@@ -16,9 +16,10 @@ site_info = pd.read_csv(
 )
 maxiter = 10  # (default=100 takes ages)
 opt_method = "diff_evo"  # "minimize","diff_evo"
+VPRM_old_or_new = "new"  # "old","new"
+VEGFRA = 1  # not applied for EC measurements, set to 1
 
-
-# TODO: ll flux tower NEE data was u-star filtered using site-specific thresholds determined
+# TODO: all flux tower NEE data was u-star filtered using site-specific thresholds determined
 # visually by plotting averaged nighttime NEE along binned u-star intervals (Barr et al., 2013).
 ###########################################################################################
 
@@ -30,7 +31,7 @@ flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
 
 optimized_params_df_all = pd.DataFrame()
 
-for folder in flx_folders:
+for folder in flx_folders[10:-1]:
     print(folder)
 
     site_name = "_".join(folder.split("_")[1:2])
@@ -182,69 +183,155 @@ for folder in flx_folders:
     Tmax = 45
     Topt = 20.0
 
-    # VPRM_table_Europe = {
-    #     'PFT': ['Evergreen', 'Deciduous', 'Mixed Forest', 'Shrubland', 'Savanna', 'Cropland', 'Grassland'],
-    #     'VEGTYP': [1, 2, 3, 4, 5, 6, 7],
-    #     'PAR0': [270.2, 271.4, 236.6, 363.0, 682.0, 690.3, 229.1],
-    #     'lambda': [-0.3084, -0.1955, -0.2856, -0.0874, -0.1141, -0.1350, -0.1748],
-    #     'alpha': [0.1797, 0.1495, 0.2258, 0.0239, 0.0049, 0.1699, 0.0881],
-    #     'beta': [0.8800, 0.8233, 0.4321, 0.0000, 0.0000, -0.0144, 0.5843]
-    # }
+    if VPRM_old_or_new == "old":
+        VPRM_table_first_guess = (
+            {  # adopted from VPRM_table_Europe and values for Wetland from Gourdji 2022
+                "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
+                "VEGTYP": [1, 2, 3, 4, 5, 6, 7],
+                "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
+                "lambda": [
+                    -0.3084,
+                    -0.1955,
+                    -0.2856,
+                    -0.0874,
+                    -0.0752,
+                    -0.1350,
+                    -0.1748,
+                ],
+                "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
+                "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
+            }
+        )
+    elif VPRM_old_or_new == "new":
+        VPRM_table_first_guess = {
+            "PFT": ["DBF", "ENF", "MF", "SHB", "GRA", "WET", "CRO", "CRC"],
+            "VEGTYP": [2, 1, 3, 4, 7, 5, 6, 8],
+            "T_crit": [-15, 1, 0, 5, 11, 6, 7, -1],
+            "T_mult": [0.55, 0.05, 0.05, 0.1, 0.1, 0.1, 0.05, 0],
+            "lambda": [
+                -0.1023,
+                -0.1097,
+                -0.1097,
+                -0.0996,
+                -0.1273,
+                -0.1227,
+                -0.0732,
+                -0.0997,
+            ],
+            "PAR0": [539, 506, 506, 811, 673, 456, 1019, 1829],
+            "beta": [0.12, 0.47, 0.47, 1.53, -6.18, -0.82, -1.20, -0.02],
+            "alpha1": [0.065, 0.088, 0.088, 0.004, 0.853, 0.261, 0.234, 0.083],
+            "alpha2": [
+                0.0024,
+                0.0047,
+                0.0047,
+                0.0049,
+                -0.0250,
+                -0.0051,
+                -0.0060,
+                -0.0018,
+            ],
+            "gamma": [4.61, 1.39, 1.39, 0.09, 5.19, 3.46, 3.85, 4.89],
+            "theta1": [
+                0.116,
+                -0.530,
+                -0.530,
+                -1.787,
+                1.749,
+                -0.7,
+                0.032,
+                0.150,
+            ],
+            "theta2": [
+                -0.0005,
+                0.2063,
+                0.2063,
+                0.4537,
+                -0.2829,
+                0.0990,
+                -0.0429,
+                -0.1324,
+            ],
+            "theta3": [
+                0.0009,
+                -0.0054,
+                -0.0054,
+                -0.0138,
+                0.0166,
+                0.0018,
+                0.0090,
+                0.0156,
+            ],
+        }
+    else:
+        print("ERROR - you have to choose VPRM_old_or_new")
 
-    VPRM_table_Europe_wet = {
-        "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
-        "VEGTYP": [1, 2, 3, 4, 5, 6, 7],
-        "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
-        "lambda": [-0.3084, -0.1955, -0.2856, -0.0874, -0.0752, -0.1350, -0.1748],
-        "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
-        "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
-    }
-
-    # TODO:
-    # VPRM_new_table_gourji = {
-    #     'PFT': ['DBF', 'EMFlt40', 'ENF', 'SHB', 'GRA', 'WET', 'CRO', 'CRC'],
-    #     'Tmin': [0, 0, 0, 0, 0, 0, 0, 0],
-    #     'Tmax': [45, 45, 45, 45, 45, 45, 45, 45],
-    #     'Topt': [23, 18, 20, 7, 20, 29, 26, 35],
-    #     'Tcrit': [-15, 1, 0, 5, 1, 6, 7, -1],
-    #     'Tmult': [0.55, 0.05, 0, 0.41, 0.14, 0.14, 0.05, 0],
-    #     'lambda': [-0.1023, -0.1097, -0.0920, -0.0996, -0.1273, -0.1227, -0.0732, -0.0997],
-    #     'PAR0': [539, 506, 896, 811, 673, 456, 1019, 1829],
-    #     'beta': [0.12, 0.47, 0.28, 1.53, -6.18, -0.82, -1.20, -0.02],
-    #     'alpha1': [0.065, 0.088, 0.025, 0.004, 0.853, 0.261, 0.234, 0.083],
-    #     'alpha2': [0.0024, 0.0047, 0.0058, 0.0049, -0.0250, -0.0051, -0.0060, -0.0018],
-    #     'gamma': [4.61, 1.39, 4.18, 0.09, 5.19, 3.46, 3.85, 4.89],
-    #     'theta1': [0.116, -0.530, -0.729, -1.787, 1.749, -0.7, 0.032, 0.150],
-    #     'theta2': [-0.0005, 0.2063, 0.1961, 0.4537, -0.2829, 0.0990, -0.0429, -0.1324],
-    #     'theta3': [0.0009, -0.0054, -0.0055, -0.0138, 0.0166, 0.0018, 0.0090, 0.0156]
-    # }
-
-    df_VPRM_table_Europe = pd.DataFrame(VPRM_table_Europe_wet)
-    parameters = df_VPRM_table_Europe[df_VPRM_table_Europe["PFT"] == target_pft].iloc[0]
-    PAR0 = parameters["PAR0"]
-    alpha = parameters["alpha"]
-    beta = parameters["beta"]
-    lambd = -parameters["lambda"]
-    VEGTYP = parameters["VEGTYP"]
-    VEGFRA = 1
-
-    GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
-        Tmin,
-        Tmax,
-        Topt,
-        PAR0,
-        alpha,
-        beta,
-        lambd,
-        T2M,
-        LSWI,
-        LSWI_min,
-        LSWI_max,
-        EVI,
-        PAR,
-        VEGTYP,
-        VEGFRA,
-    )
+    df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
+    parameters = df_VPRM_table_first_guess[
+        df_VPRM_table_first_guess["PFT"] == target_pft
+    ].iloc[0]
+    if VPRM_old_or_new == "old":
+        PAR0 = parameters["PAR0"]
+        alpha = parameters["alpha"]
+        beta = parameters["beta"]
+        lambd = -parameters["lambda"]
+        VEGTYP = parameters["VEGTYP"]
+    if VPRM_old_or_new == "new":
+        PAR0 = parameters["PAR0"]
+        beta = parameters["beta"]
+        lambd = -parameters["lambda"]
+        VEGTYP = parameters["VEGTYP"]
+        T_crit = parameters["T_crit"]
+        T_mult = parameters["T_mult"]
+        alpha1 = parameters["alpha1"]
+        alpha2 = parameters["alpha2"]
+        gamma = parameters["gamma"]
+        theta1 = parameters["theta1"]
+        theta2 = parameters["theta2"]
+        theta3 = parameters["theta3"]
+    if VPRM_old_or_new == "old":
+        GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
+            Tmin,
+            Tmax,
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VEGTYP,
+            VEGFRA,
+        )
+    elif VPRM_old_or_new == "new":
+        GPP_VPRM, Reco_VPRM = VPRM_new_for_timeseries(
+            Tmin,
+            Tmax,
+            Topt,
+            PAR0,
+            beta,
+            lambd,
+            T_crit,
+            T_mult,
+            alpha1,
+            alpha2,
+            gamma,
+            theta1,
+            theta2,
+            theta3,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VEGTYP,
+            VEGFRA,
+        )
 
     df_site_and_modis["GPP_VPRM"] = GPP_VPRM
     df_site_and_modis["Reco_VPRM"] = Reco_VPRM
@@ -267,16 +354,174 @@ for folder in flx_folders:
         PAR = df_year["PAR"].reset_index(drop=True)
 
         # Define the objective function
-        def objective_function_VPRM(x):
-            Tmin, Tmax, Topt, PAR0, alpha, beta, lambd = x
-            GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
+        if VPRM_old_or_new == "old":
+
+            def objective_function_VPRM(x):
+                Tmin, Tmax, Topt, PAR0, alpha, beta, lambd = x
+                GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
+                    Tmin,
+                    Tmax,
+                    Topt,
+                    PAR0,
+                    alpha,
+                    beta,
+                    lambd,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                    PAR,
+                    VEGTYP,
+                    VEGFRA,
+                )
+                residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
+                    nee
+                ]
+                return np.sum(residuals_NEE**2)
+
+        elif VPRM_old_or_new == "new":
+
+            def objective_function_VPRM_new(x):
+                (
+                    Tmin,
+                    Tmax,
+                    Topt,
+                    PAR0,
+                    beta,
+                    lambd,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                ) = x
+                GPP_VPRM, Reco_VPRM = VPRM_new_for_timeseries(
+                    Tmin,
+                    Tmax,
+                    Topt,
+                    PAR0,
+                    beta,
+                    lambd,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                    PAR,
+                    VEGTYP,
+                    VEGFRA,
+                )
+                residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
+                    nee
+                ]
+                return np.sum(residuals_NEE**2)
+
+        if VPRM_old_or_new == "old":
+            initial_guess = [Tmin, Tmax, Topt, PAR0, alpha, beta, lambd]
+        elif VPRM_old_or_new == "new":
+            initial_guess = [
                 Tmin,
                 Tmax,
                 Topt,
                 PAR0,
-                alpha,
                 beta,
                 lambd,
+                T_crit,
+                T_mult,
+                alpha1,
+                alpha2,
+                gamma,
+                theta1,
+                theta2,
+                theta3,
+            ]
+
+        # Set bounds which are valid for all PFT
+        if VPRM_old_or_new == "old":
+            bounds = [
+                (0, 0),  # Bounds for Tmin
+                (45, 45),  # Bounds for Tmax
+                (0, 50),  # Bounds for Topt
+                (0, 6000),  # Bounds for PAR0
+                (0.01, 5),  # Bounds for alpha
+                (0.01, 6),  # Bounds for beta
+                (0, 1),  # Bounds for lambd
+            ]
+        elif VPRM_old_or_new == "new":
+            bounds = [
+                (0, 0),  # Bounds for Tmin
+                (45, 45),  # Bounds for Tmax
+                (0, 50),  # Bounds for Topt
+                (1, 6000),  # Bounds for PAR0
+                (0.01, 6),  # Bounds for beta
+                (0, 1),  # Bounds for lambd
+                (-20, 20),  # Bounds for T_crit,
+                (0, 1),  # Bounds for T_mult
+                (0, 0.8),  # Bounds for alpha1
+                (-0.01, 0.01),  # Bounds for alpha2
+                (0, 10),  # Bounds for gamma
+                (-3, 3),  # Bounds for theta1
+                (-1, 1),  # Bounds for theta2
+                (-0.1, 0.1),  # Bounds for theta3
+            ]
+
+        if opt_method == "minimize":
+            # Run optimization
+            options = {"maxiter": maxiter, "disp": False}
+            if VPRM_old_or_new == "old":
+                result = minimize(
+                    objective_function_VPRM,
+                    initial_guess,
+                    bounds=bounds,
+                    options=options,
+                )
+
+            elif VPRM_old_or_new == "new":
+                result = minimize(
+                    objective_function_VPRM_new,
+                    initial_guess,
+                    bounds=bounds,
+                    options=options,
+                )
+
+            optimized_params = result.x
+
+        elif opt_method == "diff_evo":
+            if VPRM_old_or_new == "old":
+                result = differential_evolution(
+                    objective_function_VPRM,
+                    bounds,
+                    maxiter=maxiter,  # Number of generations
+                    disp=True,
+                )
+            elif VPRM_old_or_new == "new":
+                result = differential_evolution(
+                    objective_function_VPRM_new,
+                    bounds,
+                    maxiter=maxiter,  # Number of generations
+                    disp=True,
+                )
+
+            optimized_params = result.x
+        else:
+            print("ERROR you have to choose an optimization Method")
+
+        # Calculate model predictions with optimized parameters
+        if VPRM_old_or_new == "old":
+            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
+                *optimized_params,
                 T2M,
                 LSWI,
                 LSWI_min,
@@ -284,55 +529,45 @@ for folder in flx_folders:
                 EVI,
                 PAR,
                 VEGTYP,
-                VEGFRA,
+                VEGFRA
             )
-            residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[nee]
-            return np.sum(residuals_NEE**2)
 
-        initial_guess = [Tmin, Tmax, Topt, PAR0, alpha, beta, lambd]
-
-        # Set bounds which are valid for all PFT
-        bounds = [
-            (0, 0),  # Bounds for Tmin
-            (45, 45),  # Bounds for Tmax
-            (0, 50),  # Bounds for Topt
-            (0, 6000),  # Bounds for PAR0
-            (0.01, 5),  # Bounds for alpha
-            (0.01, 6),  # Bounds for beta
-            (0, 1),  # Bounds for lambd
-        ]
-
-        if opt_method == "minimize":
-            # Run optimization
-            options = {"maxiter": maxiter, "disp": False}
-            result = minimize(
-                objective_function_VPRM, initial_guess, bounds=bounds, options=options
+        elif VPRM_old_or_new == "new":
+            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_new_for_timeseries(
+                *optimized_params,
+                T2M,
+                LSWI,
+                LSWI_min,
+                LSWI_max,
+                EVI,
+                PAR,
+                VEGTYP,
+                VEGFRA
             )
-            optimized_params = result.x
-        elif opt_method == "diff_evo":
-            result = differential_evolution(
-                objective_function_VPRM,
-                bounds,
-                maxiter=maxiter,  # Number of generations
-                disp=True,
-            )
-            optimized_params = result.x
-        else:
-            print("ERROR you have to choose an optimization Method")
 
-        # Calculate model predictions with optimized parameters
-        GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
-            *optimized_params, T2M, LSWI, LSWI_min, LSWI_max, EVI, PAR, VEGTYP, VEGFRA
+        plot_measured_vs_optimized_VPRM(
+            df_year,
+            nee,
+            gpp,
+            df_year["GPP_VPRM"],
+            GPP_VPRM_optimized,
+            r_eco,
+            df_year["Reco_VPRM"],
+            Reco_VPRM_optimized,
+            base_path,
+            folder,
+            VPRM_old_or_new,
+            year,
+            opt_method,
+            maxiter,
         )
-        # Calculate R²
+        # Calculate error measures
         R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
         R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
         R2_NEE = r2_score(
             df_year[nee],
             np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
         )
-        # Calculate other measures
-        # root mean squared error
         rmse_GPP = np.sqrt(
             mean_squared_error(df_year[gpp], np.array(GPP_VPRM_optimized))
         )
@@ -349,31 +584,66 @@ for folder in flx_folders:
             np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
         ) / sum(df_year[nee])
 
-        data_to_append = pd.DataFrame(
-            {
-                "site_ID": [site_name],
-                "PFT": [target_pft],
-                "Year": [year],
-                "Tmin_opt": [optimized_params[0]],
-                "Tmax_opt": [optimized_params[1]],
-                "Topt_opt": [optimized_params[2]],
-                "PAR0_opt": [optimized_params[3]],
-                "alpha_opt": [optimized_params[4]],
-                "beta_opt": [optimized_params[5]],
-                "lambd_opt": [optimized_params[6]],
-                "R2_GPP": [R2_GPP],
-                "R2_Reco": [R2_Reco],
-                "R2_NEE": [R2_NEE],
-                "RMSE_GPP": [rmse_GPP],
-                "RMSE_Reco": [rmse_Reco],
-                "RMSE_NEE": [rmse_NEE],
-                "percent_NEE_sum": [percent_of_sum],
-                "T_mean": [df_year[t_air].mean()],
-                "lat": [latitude],
-                "lon": [longitude],
-                "elev": [elevation],
-            }
-        )
+        if VPRM_old_or_new == "old":
+            data_to_append = pd.DataFrame(
+                {
+                    "site_ID": [site_name],
+                    "PFT": [target_pft],
+                    "Year": [year],
+                    "Tmin": [optimized_params[0]],
+                    "Tmax": [optimized_params[1]],
+                    "Topt": [optimized_params[2]],
+                    "PAR0": [optimized_params[3]],
+                    "alpha": [optimized_params[4]],
+                    "beta": [optimized_params[5]],
+                    "lambd": [optimized_params[6]],
+                    "R2_GPP": [R2_GPP],
+                    "R2_Reco": [R2_Reco],
+                    "R2_NEE": [R2_NEE],
+                    "RMSE_GPP": [rmse_GPP],
+                    "RMSE_Reco": [rmse_Reco],
+                    "RMSE_NEE": [rmse_NEE],
+                    "percent_NEE_sum": [percent_of_sum],
+                    "T_mean": [df_year[t_air].mean()],
+                    "lat": [latitude],
+                    "lon": [longitude],
+                    "elev": [elevation],
+                }
+            )
+        elif VPRM_old_or_new == "new":
+            data_to_append = pd.DataFrame(
+                {
+                    "site_ID": [site_name],
+                    "PFT": [target_pft],
+                    "Year": [year],
+                    "Tmin": [optimized_params[0]],
+                    "Tmax": [optimized_params[1]],
+                    "Topt": [optimized_params[2]],
+                    "PAR0": [optimized_params[3]],
+                    "beta": [optimized_params[4]],
+                    "lambd": [optimized_params[5]],
+                    "T_crit": [optimized_params[6]],
+                    "T_mult": [optimized_params[7]],
+                    "alpha1": [optimized_params[8]],
+                    "alpha2": [optimized_params[9]],
+                    "gamma": [optimized_params[10]],
+                    "theta1": [optimized_params[11]],
+                    "theta2": [optimized_params[12]],
+                    "theta3": [optimized_params[13]],
+                    "R2_GPP": [R2_GPP],
+                    "R2_Reco": [R2_Reco],
+                    "R2_NEE": [R2_NEE],
+                    "RMSE_GPP": [rmse_GPP],
+                    "RMSE_Reco": [rmse_Reco],
+                    "RMSE_NEE": [rmse_NEE],
+                    "percent_NEE_sum": [percent_of_sum],
+                    "T_mean": [df_year[t_air].mean()],
+                    "lat": [latitude],
+                    "lon": [longitude],
+                    "elev": [elevation],
+                }
+            )
+
         print(data_to_append)
         optimized_params_df = pd.concat(
             [optimized_params_df, data_to_append], ignore_index=True
@@ -429,8 +699,9 @@ for folder in flx_folders:
         axes[i].grid(True)
     plt.tight_layout()
     plt.savefig(base_path + folder + "/check_input.png")
+    plt.close(fig)
 
-    # Plot measured vs. standard model for all years
+    # Plot measured vs. first guess for all years
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
     axes[0].plot(
         df_site_and_modis.index,
@@ -502,158 +773,17 @@ for folder in flx_folders:
     axes[2].legend()
     axes[2].grid(True)
     plt.tight_layout()
-    plt.savefig(base_path + folder + "/compare_fluxes.png")
-
-    # Plot measured vs. standard model for each year with optimized parameters
-    i = 0
-    for year in range(start_year, end_year):  # Assuming data spans from 2002 to 2012
-        # Filter data for the current year
-        df_year = df_site_and_modis[df_site_and_modis.index.year == year]
-
-        # Extract relevant columns
-        T2M = df_year[t_air].reset_index(drop=True)
-        LSWI = df_year["LSWI"].reset_index(drop=True)
-        EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
-        PAR = df_year["PAR"].reset_index(drop=True)
-        GPP_VPRM_opt, Reco_VPRM_opt = VPRM_for_timeseries(
-            optimized_params_df["Tmin_opt"][i],
-            optimized_params_df["Tmax_opt"][i],
-            optimized_params_df["Topt_opt"][i],
-            optimized_params_df["PAR0_opt"][i],
-            optimized_params_df["alpha_opt"][i],
-            optimized_params_df["beta_opt"][i],
-            optimized_params_df["lambd_opt"][i],
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VEGTYP,
-            VEGFRA,
-        )
-        i = i + 1
-        # Update DataFrame with optimized results
-        df_year.loc[:, "GPP_VPRM_opt"] = np.array(GPP_VPRM_opt)
-        df_year.loc[:, "Reco_VPRM_opt"] = np.array(Reco_VPRM_opt)
-
-        # Create a figure with subplots
-        fig, axes = plt.subplots(3, 1, figsize=(10, 18))
-
-        # Plot comparison of GPP
-        axes[0].plot(
-            df_year.index,
-            df_year["GPP_VPRM"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled GPP",
-            color="green",
-        )
-        axes[0].plot(
-            df_year.index,
-            df_year["GPP_VPRM_opt"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled GPP optimized",
-            color="red",
-        )
-        axes[0].plot(
-            df_year.index,
-            df_year[gpp],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Measured GPP",
-            color="blue",
-        )
-        axes[0].set_xlabel("Date")
-        axes[0].set_ylabel("GPP")
-        axes[0].set_title("Comparison of Measured and Modeled GPP")
-        axes[0].legend()
-        axes[0].grid(True)
-        axes[1].plot(
-            df_year.index,
-            df_year["Reco_VPRM"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled Reco",
-            color="green",
-        )
-        axes[1].plot(
-            df_year.index,
-            df_year["Reco_VPRM_opt"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled Reco optimized",
-            color="red",
-        )
-        axes[1].plot(
-            df_year.index,
-            df_year[r_eco],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Measured Reco",
-            color="blue",
-        )
-        axes[1].set_xlabel("Date")
-        axes[1].set_ylabel("Reco")
-        axes[1].set_title("Comparison of Measured and Modeled Reco")
-        axes[1].legend()
-        axes[1].grid(True)
-        axes[2].plot(
-            df_year.index,
-            df_year["Reco_VPRM"] - df_year["GPP_VPRM"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled NEE",
-            color="green",
-        )
-        axes[2].plot(
-            df_year.index,
-            df_year["Reco_VPRM_opt"] - df_year["GPP_VPRM_opt"],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Modeled NEE optimized",
-            color="red",
-        )
-        axes[2].plot(
-            df_year.index,
-            df_year[nee],
-            linestyle="",
-            marker="o",
-            markersize=1,
-            label="Measured NEE",
-            color="blue",
-        )
-        axes[2].set_xlabel("Date")
-        axes[2].set_ylabel("NEE")
-        axes[2].set_title("Comparison of Measured and Modeled NEE")
-        axes[2].legend()
-        axes[2].grid(True)
-        plt.tight_layout()
-        plt.savefig(
-            base_path
-            + folder
-            + "/compare_optimized_fluxes"
-            + str(year)
-            + "_"
-            + str(opt_method)
-            + "_"
-            + str(maxiter)
-            + ".png"
-        )
-
-        del df_year
-        # plt.show()
+    plt.savefig(base_path + folder + "/compare_fluxes_VPRM_" + VPRM_old_or_new + ".png")
+    plt.close(fig)
 
 optimized_params_df_all.to_excel(
-    base_path + "all_optimized_params_" + opt_method + "_" + str(maxiter) + ".xlsx",
+    base_path
+    + "all_optimized_params_VPRM_"
+    + VPRM_old_or_new
+    + "_"
+    + opt_method
+    + "_"
+    + str(maxiter)
+    + ".xlsx",
     index=False,
 )
