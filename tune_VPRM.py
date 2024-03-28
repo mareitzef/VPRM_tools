@@ -27,11 +27,11 @@ VEGFRA = 1  # not applied for EC measurements, set to 1
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_ES")]
 
 optimized_params_df_all = pd.DataFrame()
 
-for folder in flx_folders[10:-1]:
+for folder in flx_folders:  # TODO: input folders from bash script to run them parallely
     print(folder)
 
     site_name = "_".join(folder.split("_")[1:2])
@@ -71,15 +71,13 @@ for folder in flx_folders[10:-1]:
         gpp = "GPP_DT_VUT_REF"
         r_eco = "RECO_DT_VUT_REF"
         nee = "NEE_VUT_REF"
+        night = "NIGHT"
         # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
         sw_in = "SW_IN_F"
-        columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in]
+        columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night]
         df_site = pd.read_csv(file_path, usecols=columns_to_copy)
         df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
         df_site.set_index(timestamp, inplace=True)
-        # TODO: where is the ERROR?? needs /3 at Neustift
-        # df_site[gpp]=df_site[gpp]/3
-        # df_site[r_eco]=df_site[r_eco]/3
 
         # Define the modis_path for MODIS files
         modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
@@ -187,7 +185,7 @@ for folder in flx_folders[10:-1]:
         VPRM_table_first_guess = (
             {  # adopted from VPRM_table_Europe and values for Wetland from Gourdji 2022
                 "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
-                "VEGTYP": [1, 2, 3, 4, 5, 6, 7],
+                "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
                 "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
                 "lambda": [
                     -0.3084,
@@ -204,8 +202,8 @@ for folder in flx_folders[10:-1]:
         )
     elif VPRM_old_or_new == "new":
         VPRM_table_first_guess = {
-            "PFT": ["DBF", "ENF", "MF", "SHB", "GRA", "WET", "CRO", "CRC"],
-            "VEGTYP": [2, 1, 3, 4, 7, 5, 6, 8],
+            "PFT": ["DBF", "ENF", "MF", "OSH", "GRA", "WET", "CRO", "CRC"],
+            "VPRM_veg_ID": [2, 1, 3, 4, 7, 5, 6, 8],
             "T_crit": [-15, 1, 0, 5, 11, 6, 7, -1],
             "T_mult": [0.55, 0.05, 0.05, 0.1, 0.1, 0.1, 0.05, 0],
             "lambda": [
@@ -275,12 +273,12 @@ for folder in flx_folders[10:-1]:
         alpha = parameters["alpha"]
         beta = parameters["beta"]
         lambd = -parameters["lambda"]
-        VEGTYP = parameters["VEGTYP"]
+        VPRM_veg_ID = parameters["VPRM_veg_ID"]
     if VPRM_old_or_new == "new":
         PAR0 = parameters["PAR0"]
         beta = parameters["beta"]
         lambd = -parameters["lambda"]
-        VEGTYP = parameters["VEGTYP"]
+        VPRM_veg_ID = parameters["VPRM_veg_ID"]
         T_crit = parameters["T_crit"]
         T_mult = parameters["T_mult"]
         alpha1 = parameters["alpha1"]
@@ -304,7 +302,7 @@ for folder in flx_folders[10:-1]:
             LSWI_max,
             EVI,
             PAR,
-            VEGTYP,
+            VPRM_veg_ID,
             VEGFRA,
         )
     elif VPRM_old_or_new == "new":
@@ -329,7 +327,7 @@ for folder in flx_folders[10:-1]:
             LSWI_max,
             EVI,
             PAR,
-            VEGTYP,
+            VPRM_veg_ID,
             VEGFRA,
         )
 
@@ -372,9 +370,10 @@ for folder in flx_folders[10:-1]:
                     LSWI_max,
                     EVI,
                     PAR,
-                    VEGTYP,
+                    VPRM_veg_ID,
                     VEGFRA,
                 )
+                # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
                 residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
                     nee
                 ]
@@ -420,7 +419,7 @@ for folder in flx_folders[10:-1]:
                     LSWI_max,
                     EVI,
                     PAR,
-                    VEGTYP,
+                    VPRM_veg_ID,
                     VEGFRA,
                 )
                 residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
@@ -528,7 +527,7 @@ for folder in flx_folders[10:-1]:
                 LSWI_max,
                 EVI,
                 PAR,
-                VEGTYP,
+                VPRM_veg_ID,
                 VEGFRA
             )
 
@@ -541,7 +540,7 @@ for folder in flx_folders[10:-1]:
                 LSWI_max,
                 EVI,
                 PAR,
-                VEGTYP,
+                VPRM_veg_ID,
                 VEGFRA
             )
 
@@ -697,8 +696,9 @@ for folder in flx_folders[10:-1]:
         axes[i].set_ylabel(var)
         axes[i].legend()
         axes[i].grid(True)
+    axes[0].set_title(site_name + " - input data")
     plt.tight_layout()
-    plt.savefig(base_path + folder + "/check_input.png")
+    plt.savefig(base_path + folder + "/" + site_name + "_check_input.png")
     plt.close(fig)
 
     # Plot measured vs. first guess for all years
@@ -723,7 +723,7 @@ for folder in flx_folders[10:-1]:
     )
     axes[0].set_xlabel("Date")
     axes[0].set_ylabel("GPP")
-    axes[0].set_title("Comparison of Measured and Modeled GPP")
+    axes[0].set_title(site_name + " - Measured and Modeled GPP")
     axes[0].legend()
     axes[0].grid(True)
     axes[1].plot(
@@ -746,7 +746,7 @@ for folder in flx_folders[10:-1]:
     )
     axes[1].set_xlabel("Date")
     axes[1].set_ylabel(r_eco)
-    axes[1].set_title("Comparison of Measured and Modeled Reco")
+    axes[1].set_title("Measured and Modeled Reco")
     axes[1].legend()
     axes[1].grid(True)
     axes[2].plot(
@@ -769,11 +769,19 @@ for folder in flx_folders[10:-1]:
     )
     axes[2].set_xlabel("Date")
     axes[2].set_ylabel(nee)
-    axes[2].set_title("Comparison of Measured and Modeled NEE")
+    axes[2].set_title("Measured and Modeled NEE")
     axes[2].legend()
     axes[2].grid(True)
     plt.tight_layout()
-    plt.savefig(base_path + folder + "/compare_fluxes_VPRM_" + VPRM_old_or_new + ".png")
+    plt.savefig(
+        base_path
+        + folder
+        + "/"
+        + site_name
+        + "_fluxes_VPRM_"
+        + VPRM_old_or_new
+        + ".png"
+    )
     plt.close(fig)
 
 optimized_params_df_all.to_excel(
