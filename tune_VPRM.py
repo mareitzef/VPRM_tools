@@ -14,15 +14,19 @@ base_path = "/home/madse/Downloads/Fluxnet_Data/"
 site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
-maxiter = 1  # (default=100 takes ages)
+
+maxiter = 2  # (default=100 takes ages)
 opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
+
+# Reco is optomized against NEE at night as it is measured directly
+# in FLUXNET Reco and GPP are seperated by a model
 # TODO: all flux tower NEE data was u-star filtered using site-specific thresholds determined
 # visually by plotting averaged nighttime NEE along binned u-star intervals (Barr et al., 2013).
-###########################################################################################
 
+###########################################################################################
 
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
@@ -53,8 +57,8 @@ if VPRM_old_or_new == "old":
             VPRM_veg_ID,
             VEGFRA,
         )
-        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-        residuals_Reco = np.array(Reco_VPRM) - df_year[nee] * df_year[night]
+
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_old_GPP(x):
@@ -110,7 +114,7 @@ elif VPRM_old_or_new == "new":
             LSWI_max,
             EVI,
         )
-        residuals_Reco = np.array(Reco_VPRM) - df_year[nee_mean] * df_year[night]
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_new_GPP(x):
