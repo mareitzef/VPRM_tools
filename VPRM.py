@@ -64,14 +64,14 @@ def calculate_GPP(lambd, Tscale, Pscale, Wscale, EVI, VEGFRA, PAR, PAR0):
     return GPP
 
 
-def VPRM_for_timeseries(
-    Tmin,
-    Tmax,
+def VPRM_old(
     Topt,
     PAR0,
     alpha,
     beta,
     lambd,
+    Tmin,
+    Tmax,
     T2M,
     LSWI,
     LSWI_min,
@@ -105,13 +105,11 @@ def VPRM_for_timeseries(
     return GPP, Reco
 
 
-def VPRM_new_for_timeseries(
-    Tmin,
-    Tmax,
+def VPRM_new(
     Topt,
     PAR0,
-    beta,
     lambd,
+    beta,
     T_crit,
     T_mult,
     alpha1,
@@ -120,6 +118,8 @@ def VPRM_new_for_timeseries(
     theta1,
     theta2,
     theta3,
+    Tmin,
+    Tmax,
     T2M,
     LSWI,
     LSWI_min,
@@ -161,3 +161,72 @@ def VPRM_new_for_timeseries(
         Reco.append(max(0, Reco_t))
 
     return GPP, Reco
+
+
+def VPRM_new_only_Reco(
+    beta,
+    T_crit,
+    T_mult,
+    alpha1,
+    alpha2,
+    gamma,
+    theta1,
+    theta2,
+    theta3,
+    T2M,
+    LSWI,
+    LSWI_min,
+    LSWI_max,
+    EVI,
+):
+
+    Reco = (
+        []
+    )  # only Reco is different in VPRM_new, but as VPRM is optimized against NEE it also changed GPP parameters
+    for i in range(len(T2M)):
+        if T2M[i] < T_crit:
+            T_ds = T_crit - T_mult * (T_crit - T2M[i])
+        else:
+            T_ds = T2M[i]
+
+        Wscale2 = (LSWI[i] - LSWI_min) / (LSWI_max - LSWI_min)
+        Reco_t = (
+            beta
+            + alpha1 * T_ds
+            + alpha2 * T_ds**2
+            + gamma * EVI[i]
+            + theta1 * Wscale2
+            + theta2 * Wscale2 * T_ds
+            + theta3 * Wscale2 * T_ds
+        )
+
+        Reco.append(max(0, Reco_t))
+
+    return Reco
+
+
+def VPRM_new_only_GPP(
+    Topt,
+    PAR0,
+    lambd,
+    Tmin,
+    Tmax,
+    T2M,
+    LSWI,
+    LSWI_min,
+    LSWI_max,
+    EVI,
+    PAR,
+    VEGTYP,
+    VEGFRA,
+):
+
+    Tscale = [calculate_tscale(t, Tmin, Tmax, Topt) for t in T2M]
+
+    Wscale = calculate_wscale(LSWI, VEGTYP, LSWI_min, LSWI_max)
+
+    Pscale = calculate_pscale(EVI, LSWI, VEGTYP, min(EVI), max(EVI))
+
+    GPP = calculate_GPP(lambd, Tscale, Pscale, Wscale, EVI, VEGFRA, PAR, PAR0)
+
+    return GPP

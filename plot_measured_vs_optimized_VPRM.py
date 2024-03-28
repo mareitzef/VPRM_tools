@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 
 
 def plot_measured_vs_optimized_VPRM(
+    site_name,
     df_year,
     nee,
     gpp,
@@ -52,7 +52,7 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[0].set_xlabel("Date")
     axes[0].set_ylabel("GPP")
-    axes[0].set_title("Comparison of Measured and Modeled GPP")
+    axes[0].set_title(site_name + " - Measured and Modeled GPP")
     axes[0].legend()
     axes[0].grid(True)
     axes[1].plot(
@@ -84,7 +84,7 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[1].set_xlabel("Date")
     axes[1].set_ylabel("Reco")
-    axes[1].set_title("Comparison of Measured and Modeled Reco")
+    axes[1].set_title("Measured and Modeled Reco")
     axes[1].legend()
     axes[1].grid(True)
     axes[2].plot(
@@ -116,7 +116,7 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[2].set_xlabel("Date")
     axes[2].set_ylabel("NEE")
-    axes[2].set_title("Comparison of Measured and Modeled NEE")
+    axes[2].set_title("Measured and Modeled NEE")
     axes[2].legend()
     axes[2].grid(True)
     plt.tight_layout()

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
-from VPRM_for_timeseries import VPRM_for_timeseries, VPRM_new_for_timeseries
+from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
 from plot_measured_vs_optimized_VPRM import plot_measured_vs_optimized_VPRM
 
 ############################## base settings #############################################
@@ -14,8 +14,8 @@ base_path = "/home/madse/Downloads/Fluxnet_Data/"
 site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
-maxiter = 10  # (default=100 takes ages)
-opt_method = "diff_evo"  # "minimize","diff_evo"
+maxiter = 1  # (default=100 takes ages)
+opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
@@ -27,7 +27,120 @@ VEGFRA = 1  # not applied for EC measurements, set to 1
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_ES")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
+
+####################################### define  functions #################################
+
+# Define the objective function
+if VPRM_old_or_new == "old":
+
+    def objective_function_VPRM_old_Reco(x):
+        Topt, PAR0, alpha, beta, lambd = x
+        GPP_VPRM, Reco_VPRM = VPRM_old(
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
+        residuals_Reco = np.array(Reco_VPRM) - df_year[nee] * df_year[night]
+        return np.sum(residuals_Reco**2)
+
+    def objective_function_VPRM_old_GPP(x):
+        Topt, PAR0, alpha, beta, lambd = x
+        GPP_VPRM, Reco_VPRM = VPRM_old(
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
+        residuals_GPP = np.array(GPP_VPRM) - (df_year[nee] - Reco_VPRM_optimized_0)
+        return np.sum(residuals_GPP**2)
+
+elif VPRM_old_or_new == "new":
+
+    def objective_function_VPRM_new_Reco(x):
+        (
+            beta,
+            T_crit,
+            T_mult,
+            alpha1,
+            alpha2,
+            gamma,
+            theta1,
+            theta2,
+            theta3,
+        ) = x
+        Reco_VPRM = VPRM_new_only_Reco(
+            beta,
+            T_crit,
+            T_mult,
+            alpha1,
+            alpha2,
+            gamma,
+            theta1,
+            theta2,
+            theta3,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+        )
+        residuals_Reco = np.array(Reco_VPRM) - df_year[nee_mean] * df_year[night]
+        return np.sum(residuals_Reco**2)
+
+    def objective_function_VPRM_new_GPP(x):
+        (
+            Topt,
+            PAR0,
+            lambd,
+        ) = x
+        GPP_VPRM = VPRM_new_only_GPP(
+            Topt,
+            PAR0,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        residuals_GPP = np.array(GPP_VPRM) - (df_year[nee_mean] - Reco_VPRM_optimized_0)
+        return np.sum(residuals_GPP**2)
+
+
+###########################################################################################
+
+################################# loop over the years #####################################
 
 optimized_params_df_all = pd.DataFrame()
 
@@ -49,11 +162,9 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             elevation = site_info["elev"][i]
         i += 1
 
-    # to run part of  the script only on undone sites
-    # if glob(os.path.join(base_path+folder, '*optimized_params.xlsx')):
-    #     continue
+    ############################### Read FLUXNET Data ##############################################
 
-    if file_path.endswith(".xlsx"):  # exception for FAIR site
+    if file_path.endswith(".xlsx"):  # exception for FAIR site TODO: make it work again
         timestamp = "Date Time"
         t_air = "Tair"
         gpp = "GPP_DT"
@@ -63,7 +174,6 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         df_site = pd.read_excel(file_path, skiprows=[1], usecols=columns_to_copy)
         df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
         df_site.set_index(timestamp, inplace=True)
-        # Define the modis_path for MODIS files
         modis_path = "/home/madse/Dropbox/PhD/WRF_2024/Tools"
     elif file_path.endswith(".csv"):
         timestamp = "TIMESTAMP_START"
@@ -72,19 +182,20 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         r_eco = "RECO_DT_VUT_REF"
         nee = "NEE_VUT_REF"
         night = "NIGHT"
+        nee_mean = "NEE_VUT_MEAN"
         # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
         sw_in = "SW_IN_F"
-        columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night]
+        columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night, nee_mean]
         df_site = pd.read_csv(file_path, usecols=columns_to_copy)
         df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
         df_site.set_index(timestamp, inplace=True)
-
-        # Define the modis_path for MODIS files
         modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
     else:
         raise ValueError(
             "Unsupported file format. Only Excel (.xlsx) and CSV (.csv) files are supported."
         )
+
+    ##################################### Check data #########################################
 
     df_site.loc[df_site[t_air] < -40, t_air] = np.nan
     df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
@@ -95,6 +206,8 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         df_site_hour[sw_in] * 0.505
     )  # assuming that PAR = 50.5% of globar radiation (Mahadevan 2008)
     df_site_hour.drop(columns=[sw_in], inplace=True)
+
+    ##################################### read  MODIS data ##################################
 
     mod_files = glob(os.path.join(modis_path, "*_MOD*.xlsx"))
     myd_files = glob(os.path.join(modis_path, "*_MYD*.xlsx"))
@@ -155,10 +268,10 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     if nan_summary.any():
         print("WARNING: There are NaN values in the DataFrame")
 
+    ############################# prepare input variables  #############################
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
     ) / (df_site_and_modis["sur_refl_b02"] + df_site_and_modis["sur_refl_b06"])
-
     T2M = df_site_and_modis[t_air]
     EVI = df_site_and_modis["250m_16_days_EVI"]
     PAR = df_site_and_modis["PAR"]
@@ -181,25 +294,26 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     Tmax = 45
     Topt = 20.0
 
+    #############################  first guess  of parameters #########################
+    # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
-        VPRM_table_first_guess = (
-            {  # adopted from VPRM_table_Europe and values for Wetland from Gourdji 2022
-                "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
-                "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
-                "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
-                "lambda": [
-                    -0.3084,
-                    -0.1955,
-                    -0.2856,
-                    -0.0874,
-                    -0.0752,
-                    -0.1350,
-                    -0.1748,
-                ],
-                "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
-                "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
-            }
-        )
+        VPRM_table_first_guess = {
+            "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
+            "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
+            "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
+            "lambda": [
+                -0.3084,
+                -0.1955,
+                -0.2856,
+                -0.0874,
+                -0.0752,
+                -0.1350,
+                -0.1748,
+            ],
+            "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
+            "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
+        }
+    ###################### table from Gourdji 2022 for VPRM_new ############################
     elif VPRM_old_or_new == "new":
         VPRM_table_first_guess = {
             "PFT": ["DBF", "ENF", "MF", "OSH", "GRA", "WET", "CRO", "CRC"],
@@ -264,6 +378,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     else:
         print("ERROR - you have to choose VPRM_old_or_new")
 
+    ###################### select first guess according to PFT ##########################
     df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
     parameters = df_VPRM_table_first_guess[
         df_VPRM_table_first_guess["PFT"] == target_pft
@@ -287,15 +402,17 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         theta1 = parameters["theta1"]
         theta2 = parameters["theta2"]
         theta3 = parameters["theta3"]
+
+    ###################### run VPRM with first Guess for comparison #######################
     if VPRM_old_or_new == "old":
-        GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
-            Tmin,
-            Tmax,
+        GPP_VPRM, Reco_VPRM = VPRM_old(
             Topt,
             PAR0,
             alpha,
             beta,
             lambd,
+            Tmin,
+            Tmax,
             T2M,
             LSWI,
             LSWI_min,
@@ -306,9 +423,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             VEGFRA,
         )
     elif VPRM_old_or_new == "new":
-        GPP_VPRM, Reco_VPRM = VPRM_new_for_timeseries(
-            Tmin,
-            Tmax,
+        GPP_VPRM, Reco_VPRM = VPRM_new(
             Topt,
             PAR0,
             beta,
@@ -321,6 +436,8 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             theta1,
             theta2,
             theta3,
+            Tmin,
+            Tmax,
             T2M,
             LSWI,
             LSWI_min,
@@ -331,9 +448,10 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             VEGFRA,
         )
 
-    df_site_and_modis["GPP_VPRM"] = GPP_VPRM
-    df_site_and_modis["Reco_VPRM"] = Reco_VPRM
+    df_site_and_modis["GPP_VPRM_first_guess"] = GPP_VPRM
+    df_site_and_modis["Reco_VPRM_first_guess"] = Reco_VPRM
 
+    ###################### optimization for each site year  ####################
     optimized_params_df = pd.DataFrame()
 
     start_year = df_site_and_modis[timestamp].dt.year.min()
@@ -351,92 +469,11 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
         PAR = df_year["PAR"].reset_index(drop=True)
 
-        # Define the objective function
         if VPRM_old_or_new == "old":
-
-            def objective_function_VPRM(x):
-                Tmin, Tmax, Topt, PAR0, alpha, beta, lambd = x
-                GPP_VPRM, Reco_VPRM = VPRM_for_timeseries(
-                    Tmin,
-                    Tmax,
-                    Topt,
-                    PAR0,
-                    alpha,
-                    beta,
-                    lambd,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                    PAR,
-                    VPRM_veg_ID,
-                    VEGFRA,
-                )
-                # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-                residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
-                    nee
-                ]
-                return np.sum(residuals_NEE**2)
-
+            initial_guess = [Topt, PAR0, alpha, beta, lambd]
         elif VPRM_old_or_new == "new":
-
-            def objective_function_VPRM_new(x):
-                (
-                    Tmin,
-                    Tmax,
-                    Topt,
-                    PAR0,
-                    beta,
-                    lambd,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                ) = x
-                GPP_VPRM, Reco_VPRM = VPRM_new_for_timeseries(
-                    Tmin,
-                    Tmax,
-                    Topt,
-                    PAR0,
-                    beta,
-                    lambd,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                    PAR,
-                    VPRM_veg_ID,
-                    VEGFRA,
-                )
-                residuals_NEE = (np.array(Reco_VPRM) - np.array(GPP_VPRM)) - df_year[
-                    nee
-                ]
-                return np.sum(residuals_NEE**2)
-
-        if VPRM_old_or_new == "old":
-            initial_guess = [Tmin, Tmax, Topt, PAR0, alpha, beta, lambd]
-        elif VPRM_old_or_new == "new":
-            initial_guess = [
-                Tmin,
-                Tmax,
-                Topt,
-                PAR0,
+            initial_guess_Reco = [
                 beta,
-                lambd,
                 T_crit,
                 T_mult,
                 alpha1,
@@ -446,12 +483,11 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 theta2,
                 theta3,
             ]
+            initial_guess_GPP = [Topt, PAR0, lambd]
 
-        # Set bounds which are valid for all PFT
+        ####################### Set bounds which are valid for all PFTs ################
         if VPRM_old_or_new == "old":
             bounds = [
-                (0, 0),  # Bounds for Tmin
-                (45, 45),  # Bounds for Tmax
                 (0, 50),  # Bounds for Topt
                 (0, 6000),  # Bounds for PAR0
                 (0.01, 5),  # Bounds for alpha
@@ -459,13 +495,13 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 (0, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
-            bounds = [
-                (0, 0),  # Bounds for Tmin
-                (45, 45),  # Bounds for Tmax
+            bounds_GPP = [
                 (0, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
-                (0.01, 6),  # Bounds for beta
                 (0, 1),  # Bounds for lambd
+            ]
+            bounds_Reco = [
+                (0.01, 6),  # Bounds for beta
                 (-20, 20),  # Bounds for T_crit,
                 (0, 1),  # Bounds for T_mult
                 (0, 0.8),  # Bounds for alpha1
@@ -476,51 +512,188 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 (-0.1, 0.1),  # Bounds for theta3
             ]
 
-        if opt_method == "minimize":
-            # Run optimization
+        ################### the first option is 'minimize' which is faster but worse ###############
+        if opt_method == "minimize_V2":
             options = {"maxiter": maxiter, "disp": False}
             if VPRM_old_or_new == "old":
+                ################### first Reco is optimizes against nighttime NEE ###############
                 result = minimize(
-                    objective_function_VPRM,
+                    objective_function_VPRM_old_Reco,
                     initial_guess,
                     bounds=bounds,
                     options=options,
                 )
+                optimized_params_t = result.x
+
+                GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
+                    *optimized_params_t,
+                    Tmin,
+                    Tmax,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                    PAR,
+                    VPRM_veg_ID,
+                    VEGFRA,
+                )
+                ################### second GPP  is optimized against NEE - modeled Reco ###
+                result = minimize(
+                    objective_function_VPRM_old_GPP,
+                    optimized_params_t,
+                    bounds=bounds,
+                    options=options,
+                )
+                optimized_params = result.x
 
             elif VPRM_old_or_new == "new":
+
                 result = minimize(
-                    objective_function_VPRM_new,
-                    initial_guess,
-                    bounds=bounds,
+                    objective_function_VPRM_new_Reco,
+                    initial_guess_Reco,
+                    bounds=bounds_Reco,
                     options=options,
                 )
 
-            optimized_params = result.x
+                optimized_params_t = result.x
+                [
+                    beta,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                ] = optimized_params_t
 
-        elif opt_method == "diff_evo":
+                Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
+                    *optimized_params_t,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                )
+
+                result = minimize(
+                    objective_function_VPRM_new_GPP,
+                    initial_guess_GPP,
+                    bounds=bounds_GPP,
+                    options=options,
+                )
+
+                [Topt, PAR0, lambd] = result.x
+                optimized_params = [
+                    Topt,
+                    PAR0,
+                    lambd,
+                    beta,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                ]
+        ################### the second method is 'differential_evolution' which is a lot better ###############
+        elif opt_method == "diff_evo_V2":
             if VPRM_old_or_new == "old":
                 result = differential_evolution(
-                    objective_function_VPRM,
+                    objective_function_VPRM_old_Reco,
                     bounds,
                     maxiter=maxiter,  # Number of generations
                     disp=True,
                 )
-            elif VPRM_old_or_new == "new":
+                optimized_params_t = result.x
+
+                GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
+                    *optimized_params_t,
+                    Tmin,
+                    Tmax,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                    PAR,
+                    VPRM_veg_ID,
+                    VEGFRA,
+                )
                 result = differential_evolution(
-                    objective_function_VPRM_new,
+                    objective_function_VPRM_old_GPP,
                     bounds,
+                    maxiter=maxiter,  # Number of generations
+                    disp=True,
+                )
+                optimized_params = result.x
+
+            elif VPRM_old_or_new == "new":
+
+                result = differential_evolution(
+                    objective_function_VPRM_new_Reco,
+                    bounds_Reco,
                     maxiter=maxiter,  # Number of generations
                     disp=True,
                 )
 
-            optimized_params = result.x
+                optimized_params_t = result.x
+                [
+                    beta,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                ] = optimized_params_t
+
+                Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
+                    *optimized_params_t,
+                    T2M,
+                    LSWI,
+                    LSWI_min,
+                    LSWI_max,
+                    EVI,
+                )
+
+                result = differential_evolution(
+                    objective_function_VPRM_new_GPP,
+                    bounds_GPP,
+                    maxiter=maxiter,  # Number of generations
+                    disp=True,
+                )
+                [Topt, PAR0, lambd] = result.x
+                optimized_params = [
+                    Topt,
+                    PAR0,
+                    lambd,
+                    beta,
+                    T_crit,
+                    T_mult,
+                    alpha1,
+                    alpha2,
+                    gamma,
+                    theta1,
+                    theta2,
+                    theta3,
+                ]
+
         else:
             print("ERROR you have to choose an optimization Method")
 
-        # Calculate model predictions with optimized parameters
+        ############### Calculate model predictions with optimized parameters ###########
         if VPRM_old_or_new == "old":
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_for_timeseries(
+            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_old(
                 *optimized_params,
+                Tmin,
+                Tmax,
                 T2M,
                 LSWI,
                 LSWI_min,
@@ -528,12 +701,14 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 EVI,
                 PAR,
                 VPRM_veg_ID,
-                VEGFRA
+                VEGFRA,
             )
 
         elif VPRM_old_or_new == "new":
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_new_for_timeseries(
+            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_new(
                 *optimized_params,
+                Tmin,
+                Tmax,
                 T2M,
                 LSWI,
                 LSWI_min,
@@ -541,17 +716,18 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 EVI,
                 PAR,
                 VPRM_veg_ID,
-                VEGFRA
+                VEGFRA,
             )
-
+        ########################## plot the data ######################
         plot_measured_vs_optimized_VPRM(
+            site_name,
             df_year,
             nee,
             gpp,
-            df_year["GPP_VPRM"],
+            df_year["GPP_VPRM_first_guess"],
             GPP_VPRM_optimized,
             r_eco,
-            df_year["Reco_VPRM"],
+            df_year["Reco_VPRM_first_guess"],
             Reco_VPRM_optimized,
             base_path,
             folder,
@@ -560,7 +736,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             opt_method,
             maxiter,
         )
-        # Calculate error measures
+        ########################## Calculate error measures ##########################
         R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
         R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
         R2_NEE = r2_score(
@@ -583,19 +759,18 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
             np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
         ) / sum(df_year[nee])
 
+        ########################## Save results to Excel ##########################
         if VPRM_old_or_new == "old":
             data_to_append = pd.DataFrame(
                 {
                     "site_ID": [site_name],
                     "PFT": [target_pft],
                     "Year": [year],
-                    "Tmin": [optimized_params[0]],
-                    "Tmax": [optimized_params[1]],
-                    "Topt": [optimized_params[2]],
-                    "PAR0": [optimized_params[3]],
-                    "alpha": [optimized_params[4]],
-                    "beta": [optimized_params[5]],
-                    "lambd": [optimized_params[6]],
+                    "Topt": [optimized_params[0]],
+                    "PAR0": [optimized_params[1]],
+                    "alpha": [optimized_params[2]],
+                    "beta": [optimized_params[3]],
+                    "lambd": [optimized_params[4]],
                     "R2_GPP": [R2_GPP],
                     "R2_Reco": [R2_Reco],
                     "R2_NEE": [R2_NEE],
@@ -615,20 +790,18 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                     "site_ID": [site_name],
                     "PFT": [target_pft],
                     "Year": [year],
-                    "Tmin": [optimized_params[0]],
-                    "Tmax": [optimized_params[1]],
-                    "Topt": [optimized_params[2]],
-                    "PAR0": [optimized_params[3]],
-                    "beta": [optimized_params[4]],
-                    "lambd": [optimized_params[5]],
-                    "T_crit": [optimized_params[6]],
-                    "T_mult": [optimized_params[7]],
-                    "alpha1": [optimized_params[8]],
-                    "alpha2": [optimized_params[9]],
-                    "gamma": [optimized_params[10]],
-                    "theta1": [optimized_params[11]],
-                    "theta2": [optimized_params[12]],
-                    "theta3": [optimized_params[13]],
+                    "Topt": [optimized_params[0]],
+                    "PAR0": [optimized_params[1]],
+                    "beta": [optimized_params[2]],
+                    "lambd": [optimized_params[3]],
+                    "T_crit": [optimized_params[4]],
+                    "T_mult": [optimized_params[5]],
+                    "alpha1": [optimized_params[6]],
+                    "alpha2": [optimized_params[7]],
+                    "gamma": [optimized_params[8]],
+                    "theta1": [optimized_params[9]],
+                    "theta2": [optimized_params[10]],
+                    "theta3": [optimized_params[11]],
                     "R2_GPP": [R2_GPP],
                     "R2_Reco": [R2_Reco],
                     "R2_NEE": [R2_NEE],
@@ -666,6 +839,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         index=False,
     )
 
+    ########################## plot each site year ################################
     # # TODO: plot the difference
     # params_difference = original_params - result.x
     variables = [
@@ -714,7 +888,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
     axes[0].plot(
         df_site_and_modis.index,
-        df_site_and_modis["GPP_VPRM"],
+        df_site_and_modis["GPP_VPRM_first_guess"],
         label="Modeled GPP",
         color="green",
         linestyle="",
@@ -737,7 +911,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
     axes[1].plot(
         df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM"],
+        df_site_and_modis["Reco_VPRM_first_guess"],
         label="Modeled Reco",
         color="green",
         linestyle="",
@@ -760,7 +934,8 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
     axes[2].plot(
         df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM"] - df_site_and_modis["GPP_VPRM"],
+        df_site_and_modis["Reco_VPRM_first_guess"]
+        - df_site_and_modis["GPP_VPRM_first_guess"],
         label="Modeled NEE",
         color="green",
         linestyle="",
