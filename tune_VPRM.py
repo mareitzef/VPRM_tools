@@ -15,8 +15,8 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 2  # (default=100 takes ages)
-opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
+maxiter = 100  # (default=100 takes ages)
+opt_method = "minimize_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
@@ -81,7 +81,7 @@ if VPRM_old_or_new == "old":
             VEGFRA,
         )
         # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-        residuals_GPP = np.array(GPP_VPRM) - (df_year[nee] - Reco_VPRM_optimized_0)
+        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
         return np.sum(residuals_GPP**2)
 
 elif VPRM_old_or_new == "new":
@@ -138,7 +138,7 @@ elif VPRM_old_or_new == "new":
             VPRM_veg_ID,
             VEGFRA,
         )
-        residuals_GPP = np.array(GPP_VPRM) - (df_year[nee_mean] - Reco_VPRM_optimized_0)
+        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
         return np.sum(residuals_GPP**2)
 
 
