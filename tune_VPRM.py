@@ -15,8 +15,8 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 10  # (default=100 takes ages)
-opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
+maxiter = 1000  # (default=100 takes ages)
+opt_method = "minimize_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
@@ -174,19 +174,25 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     nee_mean = "NEE_VUT_MEAN"
     # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
     sw_in = "SW_IN_F"
-    columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night, nee_mean]
-    df_site = pd.read_csv(file_path, usecols=columns_to_copy)
+    columns_to_copy = [timestamp, night, t_air, gpp, r_eco, nee, sw_in, nee_mean]
+    converters = {k: lambda x: float(x) for k in columns_to_copy}
+    df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
     df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
     df_site.set_index(timestamp, inplace=True)
     modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
 
     ##################################### Check data #########################################
 
+    def filter_nan(df_site, var_i):
+        df_site.loc[df_site[var_i] == -9999, var_i] = np.nan
+        return df_site
+
+    for var_i in columns_to_copy[2:]:
+        df_site = filter_nan(df_site, var_i)
+
     df_site.loc[df_site[t_air] < -40, t_air] = np.nan
     df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
-    df_site.loc[df_site[nee] == -9999, nee] = np.nan
-    df_site.loc[df_site[r_eco] == -9999, r_eco] = np.nan
-    df_site.loc[df_site[gpp] == -9999, gpp] = np.nan
+
     df_site = df_site.rolling(window=3, min_periods=1).mean()
     df_site_hour = df_site.resample("H").mean()
 
@@ -251,10 +257,13 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     df_site_and_modis.reset_index(inplace=True)
 
     nan_values = df_site_and_modis.isna()
-    nan_summary = nan_values.sum()
+    nan_sum = nan_values.sum()
+    df_site_and_modis = df_site_and_modis.dropna()
+    df_site_and_modis.reset_index(drop=True, inplace=True)
 
-    if nan_summary.any():
-        print("WARNING: There are NaN values in the DataFrame")
+    if nan_sum.any():
+        print("WARNING: There are NaN values dropped from df_site_and_modis DataFrame")
+        print(nan_sum)
 
     ############################# prepare input variables  #############################
     df_site_and_modis["LSWI"] = (
@@ -828,7 +837,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
 
     ########################## plot each site year ################################
-    # # TODO: plot the difference
+    # # TODO: plot the difference of parameters or some  other metric between sites?
     # params_difference = original_params - result.x
     variables = [
         t_air,
@@ -946,6 +955,7 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         + ".png"
     )
     plt.close(fig)
+
 
 optimized_params_df_all.to_excel(
     base_path
