@@ -15,131 +15,128 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 100  # (default=100 takes ages)
-opt_method = "minimize_V2"  # "minimize_V2","diff_evo_V2"
+maxiter = 10  # (default=100 takes ages)
+opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
 
 # Reco is optomized against NEE at night as it is measured directly
 # in FLUXNET Reco and GPP are seperated by a model
-# TODO: all flux tower NEE data was u-star filtered using site-specific thresholds determined
-# visually by plotting averaged nighttime NEE along binned u-star intervals (Barr et al., 2013).
 
 ###########################################################################################
 
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_AT-Mie")]
 
 ####################################### define  functions #################################
 
-# Define the objective function
-if VPRM_old_or_new == "old":
 
-    def objective_function_VPRM_old_Reco(x):
-        Topt, PAR0, alpha, beta, lambd = x
-        GPP_VPRM, Reco_VPRM = VPRM_old(
-            Topt,
-            PAR0,
-            alpha,
-            beta,
-            lambd,
-            Tmin,
-            Tmax,
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VPRM_veg_ID,
-            VEGFRA,
-        )
+def objective_function_VPRM_old_Reco(x):
+    Topt, PAR0, alpha, beta, lambd = x
+    GPP_VPRM, Reco_VPRM = VPRM_old(
+        Topt,
+        PAR0,
+        alpha,
+        beta,
+        lambd,
+        Tmin,
+        Tmax,
+        T2M,
+        LSWI,
+        LSWI_min,
+        LSWI_max,
+        EVI,
+        PAR,
+        VPRM_veg_ID,
+        VEGFRA,
+    )
 
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
-        return np.sum(residuals_Reco**2)
+    residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
+    return np.sum(residuals_Reco**2)
 
-    def objective_function_VPRM_old_GPP(x):
-        Topt, PAR0, alpha, beta, lambd = x
-        GPP_VPRM, Reco_VPRM = VPRM_old(
-            Topt,
-            PAR0,
-            alpha,
-            beta,
-            lambd,
-            Tmin,
-            Tmax,
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VPRM_veg_ID,
-            VEGFRA,
-        )
-        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
-        return np.sum(residuals_GPP**2)
 
-elif VPRM_old_or_new == "new":
+def objective_function_VPRM_old_GPP(x):
+    Topt, PAR0, alpha, beta, lambd = x
+    GPP_VPRM, Reco_VPRM = VPRM_old(
+        Topt,
+        PAR0,
+        alpha,
+        beta,
+        lambd,
+        Tmin,
+        Tmax,
+        T2M,
+        LSWI,
+        LSWI_min,
+        LSWI_max,
+        EVI,
+        PAR,
+        VPRM_veg_ID,
+        VEGFRA,
+    )
+    # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
+    residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
+    return np.sum(residuals_GPP**2)
 
-    def objective_function_VPRM_new_Reco(x):
-        (
-            beta,
-            T_crit,
-            T_mult,
-            alpha1,
-            alpha2,
-            gamma,
-            theta1,
-            theta2,
-            theta3,
-        ) = x
-        Reco_VPRM = VPRM_new_only_Reco(
-            beta,
-            T_crit,
-            T_mult,
-            alpha1,
-            alpha2,
-            gamma,
-            theta1,
-            theta2,
-            theta3,
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-        )
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
-        return np.sum(residuals_Reco**2)
 
-    def objective_function_VPRM_new_GPP(x):
-        (
-            Topt,
-            PAR0,
-            lambd,
-        ) = x
-        GPP_VPRM = VPRM_new_only_GPP(
-            Topt,
-            PAR0,
-            lambd,
-            Tmin,
-            Tmax,
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VPRM_veg_ID,
-            VEGFRA,
-        )
-        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
-        return np.sum(residuals_GPP**2)
+def objective_function_VPRM_new_Reco(x):
+    (
+        beta,
+        T_crit,
+        T_mult,
+        alpha1,
+        alpha2,
+        gamma,
+        theta1,
+        theta2,
+        theta3,
+    ) = x
+    Reco_VPRM = VPRM_new_only_Reco(
+        beta,
+        T_crit,
+        T_mult,
+        alpha1,
+        alpha2,
+        gamma,
+        theta1,
+        theta2,
+        theta3,
+        T2M,
+        LSWI,
+        LSWI_min,
+        LSWI_max,
+        EVI,
+    )
+    residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
+    return np.sum(residuals_Reco**2)
+
+
+def objective_function_VPRM_new_GPP(x):
+    (
+        Topt,
+        PAR0,
+        lambd,
+    ) = x
+    GPP_VPRM = VPRM_new_only_GPP(
+        Topt,
+        PAR0,
+        lambd,
+        Tmin,
+        Tmax,
+        T2M,
+        LSWI,
+        LSWI_min,
+        LSWI_max,
+        EVI,
+        PAR,
+        VPRM_veg_ID,
+        VEGFRA,
+    )
+    residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
+    return np.sum(residuals_GPP**2)
 
 
 ###########################################################################################
@@ -168,41 +165,28 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
 
     ############################### Read FLUXNET Data ##############################################
 
-    if file_path.endswith(".xlsx"):  # exception for FAIR site TODO: make it work again
-        timestamp = "Date Time"
-        t_air = "Tair"
-        gpp = "GPP_DT"
-        r_eco = "Reco"
-        sw_in = "Rg"
-        columns_to_copy = [timestamp, t_air, gpp, r_eco, sw_in]
-        df_site = pd.read_excel(file_path, skiprows=[1], usecols=columns_to_copy)
-        df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
-        df_site.set_index(timestamp, inplace=True)
-        modis_path = "/home/madse/Dropbox/PhD/WRF_2024/Tools"
-    elif file_path.endswith(".csv"):
-        timestamp = "TIMESTAMP_START"
-        t_air = "TA_F"
-        gpp = "GPP_DT_VUT_REF"
-        r_eco = "RECO_DT_VUT_REF"
-        nee = "NEE_VUT_REF"
-        night = "NIGHT"
-        nee_mean = "NEE_VUT_MEAN"
-        # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
-        sw_in = "SW_IN_F"
-        columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night, nee_mean]
-        df_site = pd.read_csv(file_path, usecols=columns_to_copy)
-        df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
-        df_site.set_index(timestamp, inplace=True)
-        modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
-    else:
-        raise ValueError(
-            "Unsupported file format. Only Excel (.xlsx) and CSV (.csv) files are supported."
-        )
+    timestamp = "TIMESTAMP_START"
+    t_air = "TA_F"
+    gpp = "GPP_DT_VUT_REF"
+    r_eco = "RECO_DT_VUT_REF"  # or should we use "RECO_NT_VUT_REF" for validation?
+    nee = "NEE_VUT_REF"
+    night = "NIGHT"
+    nee_mean = "NEE_VUT_MEAN"
+    # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
+    sw_in = "SW_IN_F"
+    columns_to_copy = [timestamp, t_air, gpp, r_eco, nee, sw_in, night, nee_mean]
+    df_site = pd.read_csv(file_path, usecols=columns_to_copy)
+    df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
+    df_site.set_index(timestamp, inplace=True)
+    modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
 
     ##################################### Check data #########################################
 
     df_site.loc[df_site[t_air] < -40, t_air] = np.nan
     df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
+    df_site.loc[df_site[nee] == -9999, nee] = np.nan
+    df_site.loc[df_site[r_eco] == -9999, r_eco] = np.nan
+    df_site.loc[df_site[gpp] == -9999, gpp] = np.nan
     df_site = df_site.rolling(window=3, min_periods=1).mean()
     df_site_hour = df_site.resample("H").mean()
 
