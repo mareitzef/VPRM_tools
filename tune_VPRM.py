@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize, differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
 from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
-from plot_measured_vs_optimized_VPRM import plot_measured_vs_optimized_VPRM
+from plots_for_VPRM import plot_measured_vs_optimized_VPRM, boxplots_per_PFT_and_ID
 
 ############################## base settings #############################################
 
@@ -15,7 +15,7 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 1000  # (default=100 takes ages)
+maxiter = 10  # (default=100 takes ages)
 opt_method = "minimize_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -29,7 +29,7 @@ VEGFRA = 1  # not applied for EC measurements, set to 1
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_AT-Mie")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_IT-Isp")]
 
 ####################################### define  functions #################################
 
@@ -869,7 +869,11 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         axes[i].grid(True)
     axes[0].set_title(site_name + " - input data")
     plt.tight_layout()
-    plt.savefig(base_path + folder + "/" + site_name + "_check_input.png")
+    plt.savefig(
+        base_path + folder + "/" + site_name + "_check_input.eps",
+        dpi=300,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
     # Plot measured vs. first guess for all years
@@ -952,7 +956,9 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         + site_name
         + "_fluxes_VPRM_"
         + VPRM_old_or_new
-        + ".png"
+        + ".eps",
+        dpi=300,
+        bbox_inches="tight",
     )
     plt.close(fig)
 
@@ -967,4 +973,8 @@ optimized_params_df_all.to_excel(
     + str(maxiter)
     + ".xlsx",
     index=False,
+)
+
+boxplots_per_PFT_and_ID(
+    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
 )
