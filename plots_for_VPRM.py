@@ -30,7 +30,7 @@ def boxplots_per_PFT_and_ID(
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(15, 20))
     axes = axes.flatten()
 
-    for var_i in ["PFT", "siteID"]:
+    for var_i in ["PFT", "site_ID"]:
         for i, parameter in enumerate(parameters_to_plot):
             sns.boxplot(x=var_i, y=parameter, data=df_parameters, ax=axes[i])
             sns.swarmplot(

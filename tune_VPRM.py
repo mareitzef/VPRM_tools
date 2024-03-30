@@ -7,6 +7,7 @@ from scipy.optimize import minimize, differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
 from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
 from plots_for_VPRM import plot_measured_vs_optimized_VPRM, boxplots_per_PFT_and_ID
+from outputs_to_excel import write_filtered_params_to_excel, write_all_to_excel
 
 ############################## base settings #############################################
 
@@ -15,7 +16,7 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 100  # (default=100 takes ages)
+maxiter = 1  # (default=100 takes ages)
 opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -623,6 +624,8 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 VPRM_veg_ID,
                 VEGFRA,
             )
+        ########################## TODO: optimize Reco with LinGPP ######################
+
         ########################## plot the data ######################
         plot_measured_vs_optimized_VPRM(
             site_name,
@@ -870,17 +873,12 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
     plt.close(fig)
 
+write_all_to_excel(
+    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
+)
 
-optimized_params_df_all.to_excel(
-    base_path
-    + "all_optimized_params_VPRM_"
-    + VPRM_old_or_new
-    + "_"
-    + opt_method
-    + "_"
-    + str(maxiter)
-    + ".xlsx",
-    index=False,
+write_filtered_params_to_excel(
+    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
 )
 
 boxplots_per_PFT_and_ID(
