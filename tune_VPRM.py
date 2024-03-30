@@ -30,7 +30,7 @@ VEGFRA = 1  # not applied for EC measurements, set to 1
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_ES-Ln2")]
 
 ####################################### define  functions #################################
 

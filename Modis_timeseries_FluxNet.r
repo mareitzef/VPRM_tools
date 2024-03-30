@@ -37,7 +37,7 @@ folders <- c(
 
 # Loop through each site folder
 for (folder in folders) {
-    site_name <- str_extract(folder, "(?<=FLX_)[A-Z]{2}-[A-Za-z]+") # TODO: numbers are omitted try spliting
+    site_name <- str_extract(folder, "(?<=FLX_)[A-Z]{2}-[A-Za-z0-9]+")
     year_range <- gsub(".*_(\\d{4})-(\\d{4})_.*", "\\1-\\2", folder)
     start_year <- as.numeric(str_extract(year_range, "\\d{4}"))
     end_year <- as.numeric(str_extract(year_range, "(?<=-)\\d{4}"))
@@ -90,6 +90,25 @@ for (folder in folders) {
     #   LSWI =  (NIR (Band 2) - SWIR (Band 6)) / (NIR + SWIR)
     products <- c("MOD09A1", "MYD09A1")
     bands <- c("sur_refl_b02", "sur_refl_b06")
+    for (product in products) {
+        for (band in bands) {
+            subsets <- mt_batch_subset(
+                df = df,
+                product = product,
+                band = band,
+                internal = TRUE,
+                start = start_date,
+                end = end_date
+            )
+            # print(str(subsets))
+            file_name <- paste0(path, site_name, "_", product, "_", band, "_", start_date, "_", end_date, ".xlsx")
+            write.xlsx(subsets, file = file_name)
+        }
+    }
+    # Land Surface Water Index (LSWI):
+    #   LSWI =  (NIR (Band 2) - SWIR (Band 6)) / (NIR + SWIR)
+    products <- c("MOD15A2H", "MYD15A2H")
+    bands <- c("Fpar_500m", "Lai_500m") # TODO: doe we need this: "FparStdDev_500m", "LaiStdDev_500m"
     for (product in products) {
         for (band in bands) {
             subsets <- mt_batch_subset(

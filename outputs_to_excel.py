@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 def write_all_to_excel(
     optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
 ):
@@ -79,7 +82,6 @@ def write_filtered_params_to_excel(
         + str(opt_method)
         + "_"
         + str(maxiter)
-        + ".eps",
-        "filtered_mean_median_values.xlsx",
+        + ".xlsx",
         index=False,
     )
