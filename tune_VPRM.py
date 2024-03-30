@@ -15,8 +15,8 @@ site_info = pd.read_csv(
     "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
 )
 
-maxiter = 10  # (default=100 takes ages)
-opt_method = "minimize_V2"  # "minimize_V2","diff_evo_V2"
+maxiter = 100  # (default=100 takes ages)
+opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
 VPRM_old_or_new = "new"  # "old","new"
 VEGFRA = 1  # not applied for EC measurements, set to 1
 
@@ -29,7 +29,7 @@ VEGFRA = 1  # not applied for EC measurements, set to 1
 folders = [
     f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
 ]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_IT-Isp")]
+flx_folders = [folder for folder in folders if folder.startswith("FLX_")]
 
 ####################################### define  functions #################################
 
@@ -141,7 +141,7 @@ def objective_function_VPRM_new_GPP(x):
 
 ###########################################################################################
 
-################################# loop over the years #####################################
+################################# loop over the sites #####################################
 
 optimized_params_df_all = pd.DataFrame()
 
@@ -509,181 +509,89 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
                 (-0.1, 0.1),  # Bounds for theta3
             ]
 
-        ################### the first option is 'minimize' which is faster but worse ###############
-        if opt_method == "minimize_V2":
-            options = {"maxiter": maxiter, "disp": False}
-            if VPRM_old_or_new == "old":
-                ################### first Reco is optimizes against nighttime NEE ###############
-                result = minimize(
-                    objective_function_VPRM_old_Reco,
-                    initial_guess,
-                    bounds=bounds,
-                    options=options,
-                )
-                optimized_params_t = result.x
+        ################### optimize with 'differential_evolution' ###############
+        if VPRM_old_or_new == "old":
+            result = differential_evolution(
+                objective_function_VPRM_old_Reco,
+                bounds,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
+            )
+            optimized_params_t = result.x
 
-                GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
-                    *optimized_params_t,
-                    Tmin,
-                    Tmax,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                    PAR,
-                    VPRM_veg_ID,
-                    VEGFRA,
-                )
-                ################### second GPP  is optimized against NEE - modeled Reco ###
-                result = minimize(
-                    objective_function_VPRM_old_GPP,
-                    optimized_params_t,
-                    bounds=bounds,
-                    options=options,
-                )
-                optimized_params = result.x
+            GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
+                *optimized_params_t,
+                Tmin,
+                Tmax,
+                T2M,
+                LSWI,
+                LSWI_min,
+                LSWI_max,
+                EVI,
+                PAR,
+                VPRM_veg_ID,
+                VEGFRA,
+            )
+            result = differential_evolution(
+                objective_function_VPRM_old_GPP,
+                bounds,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
+            )
+            optimized_params = result.x
 
-            elif VPRM_old_or_new == "new":
+        elif VPRM_old_or_new == "new":
 
-                result = minimize(
-                    objective_function_VPRM_new_Reco,
-                    initial_guess_Reco,
-                    bounds=bounds_Reco,
-                    options=options,
-                )
+            result = differential_evolution(
+                objective_function_VPRM_new_Reco,
+                bounds_Reco,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
+            )
 
-                optimized_params_t = result.x
-                [
-                    beta,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                ] = optimized_params_t
+            optimized_params_t = result.x
+            [
+                beta,
+                T_crit,
+                T_mult,
+                alpha1,
+                alpha2,
+                gamma,
+                theta1,
+                theta2,
+                theta3,
+            ] = optimized_params_t
 
-                Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
-                    *optimized_params_t,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                )
+            Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
+                *optimized_params_t,
+                T2M,
+                LSWI,
+                LSWI_min,
+                LSWI_max,
+                EVI,
+            )
 
-                result = minimize(
-                    objective_function_VPRM_new_GPP,
-                    initial_guess_GPP,
-                    bounds=bounds_GPP,
-                    options=options,
-                )
-
-                [Topt, PAR0, lambd] = result.x
-                optimized_params = [
-                    Topt,
-                    PAR0,
-                    lambd,
-                    beta,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                ]
-        ################### the second method is 'differential_evolution' which is a lot better ###############
-        elif opt_method == "diff_evo_V2":
-            if VPRM_old_or_new == "old":
-                result = differential_evolution(
-                    objective_function_VPRM_old_Reco,
-                    bounds,
-                    maxiter=maxiter,  # Number of generations
-                    disp=True,
-                )
-                optimized_params_t = result.x
-
-                GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
-                    *optimized_params_t,
-                    Tmin,
-                    Tmax,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                    PAR,
-                    VPRM_veg_ID,
-                    VEGFRA,
-                )
-                result = differential_evolution(
-                    objective_function_VPRM_old_GPP,
-                    bounds,
-                    maxiter=maxiter,  # Number of generations
-                    disp=True,
-                )
-                optimized_params = result.x
-
-            elif VPRM_old_or_new == "new":
-
-                result = differential_evolution(
-                    objective_function_VPRM_new_Reco,
-                    bounds_Reco,
-                    maxiter=maxiter,  # Number of generations
-                    disp=True,
-                )
-
-                optimized_params_t = result.x
-                [
-                    beta,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                ] = optimized_params_t
-
-                Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
-                    *optimized_params_t,
-                    T2M,
-                    LSWI,
-                    LSWI_min,
-                    LSWI_max,
-                    EVI,
-                )
-
-                result = differential_evolution(
-                    objective_function_VPRM_new_GPP,
-                    bounds_GPP,
-                    maxiter=maxiter,  # Number of generations
-                    disp=True,
-                )
-                [Topt, PAR0, lambd] = result.x
-                optimized_params = [
-                    Topt,
-                    PAR0,
-                    lambd,
-                    beta,
-                    T_crit,
-                    T_mult,
-                    alpha1,
-                    alpha2,
-                    gamma,
-                    theta1,
-                    theta2,
-                    theta3,
-                ]
-
-        else:
-            print("ERROR you have to choose an optimization Method")
+            result = differential_evolution(
+                objective_function_VPRM_new_GPP,
+                bounds_GPP,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
+            )
+            [Topt, PAR0, lambd] = result.x
+            optimized_params = [
+                Topt,
+                PAR0,
+                lambd,
+                beta,
+                T_crit,
+                T_mult,
+                alpha1,
+                alpha2,
+                gamma,
+                theta1,
+                theta2,
+                theta3,
+            ]
 
         ############### Calculate model predictions with optimized parameters ###########
         if VPRM_old_or_new == "old":

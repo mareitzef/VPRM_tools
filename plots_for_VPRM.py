@@ -30,7 +30,7 @@ def boxplots_per_PFT_and_ID(
     fig, axes = plt.subplots(nrows=4, ncols=3, figsize=(15, 20))
     axes = axes.flatten()
 
-    for var_i in ["PFT","siteID"]:
+    for var_i in ["PFT", "siteID"]:
         for i, parameter in enumerate(parameters_to_plot):
             sns.boxplot(x=var_i, y=parameter, data=df_parameters, ax=axes[i])
             sns.swarmplot(
@@ -41,7 +41,7 @@ def boxplots_per_PFT_and_ID(
                 alpha=0.5,
                 ax=axes[i],
             )
-            axes[i].set_title(f"{parameter} by {var_i}}")
+            axes[i].set_title(f"{parameter} by {var_i}")
             axes[i].set_xlabel(var_i)
             axes[i].set_ylabel(parameter)
             axes[i].tick_params(axis="x", rotation=45)
@@ -62,10 +62,6 @@ def boxplots_per_PFT_and_ID(
             bbox_inches="tight",
         )
         plt.close(fig)
-
-
-
-
 
 
 def plot_measured_vs_optimized_VPRM(
