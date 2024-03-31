@@ -3,150 +3,176 @@ import os
 from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize, differential_evolution
+from scipy.optimize import differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
 from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
-from plots_for_VPRM import plot_measured_vs_optimized_VPRM, boxplots_per_PFT_and_ID
-from outputs_to_excel import write_filtered_params_to_excel, write_all_to_excel
-
-############################## base settings #############################################
-
-base_path = "/home/madse/Downloads/Fluxnet_Data/"
-site_info = pd.read_csv(
-    "/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv"
+from plots_for_VPRM import (
+    plot_measured_vs_optimized_VPRM,
+    boxplots_per_PFT_and_ID,
+    plot_site_year,
+    plot_measured_vs_modeled,
 )
+from outputs_to_excel import write_filtered_params_to_excel, write_all_to_excel
+import argparse
+import sys
 
-maxiter = 1  # (default=100 takes ages)
-opt_method = "diff_evo_V2"  # "minimize_V2","diff_evo_V2"
-VPRM_old_or_new = "new"  # "old","new"
-VEGFRA = 1  # not applied for EC measurements, set to 1
-
-
-# Reco is optomized against NEE at night as it is measured directly
-# in FLUXNET Reco and GPP are seperated by a model
-
-###########################################################################################
-
-folders = [
-    f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))
-]
-flx_folders = [folder for folder in folders if folder.startswith("FLX_ES-Ln2")]
-
-####################################### define  functions #################################
+############################## base settings from parser #############################################
 
 
-def objective_function_VPRM_old_Reco(x):
-    Topt, PAR0, alpha, beta, lambd = x
-    GPP_VPRM, Reco_VPRM = VPRM_old(
-        Topt,
-        PAR0,
-        alpha,
-        beta,
-        lambd,
-        Tmin,
-        Tmax,
-        T2M,
-        LSWI,
-        LSWI_min,
-        LSWI_max,
-        EVI,
-        PAR,
-        VPRM_veg_ID,
-        VEGFRA,
-    )
+def main():
 
-    residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
-    return np.sum(residuals_Reco**2)
+    if len(sys.argv) > 1:
+        parser = argparse.ArgumentParser(description="Description of your script")
+        parser.add_argument("-p", "--base_path", type=str, help="Base path argument")
+        parser.add_argument("-f", "--folder", type=str, help="Folder argument")
+        parser.add_argument("-i", "--maxiter", type=int, help="Max iteration argument")
+        parser.add_argument(
+            "-m", "--opt_method", type=str, help="Optimization method argument"
+        )
+        parser.add_argument(
+            "-v", "--VPRM_old_or_new", type=str, help="VPRM old or new argument"
+        )
+        args = parser.parse_args()
 
+        base_path = args.base_path
+        maxiter = args.maxiter
+        opt_method = args.opt_method
+        VPRM_old_or_new = args.VPRM_old_or_new
+        folder = args.folder
+    else:
 
-def objective_function_VPRM_old_GPP(x):
-    Topt, PAR0, alpha, beta, lambd = x
-    GPP_VPRM, Reco_VPRM = VPRM_old(
-        Topt,
-        PAR0,
-        alpha,
-        beta,
-        lambd,
-        Tmin,
-        Tmax,
-        T2M,
-        LSWI,
-        LSWI_min,
-        LSWI_max,
-        EVI,
-        PAR,
-        VPRM_veg_ID,
-        VEGFRA,
-    )
-    # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-    residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
-    return np.sum(residuals_GPP**2)
+        base_path = "/home/madse/Downloads/Fluxnet_Data/"
+        maxiter = 1  # (default=100 takes ages)
+        opt_method = "diff_evo_V2"  # "diff_evo_V2"
+        VPRM_old_or_new = "old"  # "old","new"
+        folder = "FLX_ES-Ln2_FLUXNET2015_FULLSET_2009-2009_1-4"
+        # folders = [
+        #     f
+        #     for f in os.listdir(base_path)
+        #     if os.path.isdir(os.path.join(base_path, f))
+        # ]
+        # flx_folders = [folder for folder in folders if folder.startswith("FLX_ES-Ln2")]
 
+        # if not flx_folders:
+        #     print("Warning - There is no input data")
+        #     raise SystemExit(0)
 
-def objective_function_VPRM_new_Reco(x):
-    (
-        beta,
-        T_crit,
-        T_mult,
-        alpha1,
-        alpha2,
-        gamma,
-        theta1,
-        theta2,
-        theta3,
-    ) = x
-    Reco_VPRM = VPRM_new_only_Reco(
-        beta,
-        T_crit,
-        T_mult,
-        alpha1,
-        alpha2,
-        gamma,
-        theta1,
-        theta2,
-        theta3,
-        T2M,
-        LSWI,
-        LSWI_min,
-        LSWI_max,
-        EVI,
-    )
-    residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
-    return np.sum(residuals_Reco**2)
+    VEGFRA = 1  # not applied for EC measurements, set to 1
+    site_info = pd.read_csv(base_path + "site_info_Alps_lat44-50_lon5-17.csv")
+    # Reco is optomized against NEE at night as it is measured directly
+    # in FLUXNET Reco and GPP are seperated by a model
 
+    ###########################################################################################
 
-def objective_function_VPRM_new_GPP(x):
-    (
-        Topt,
-        PAR0,
-        lambd,
-    ) = x
-    GPP_VPRM = VPRM_new_only_GPP(
-        Topt,
-        PAR0,
-        lambd,
-        Tmin,
-        Tmax,
-        T2M,
-        LSWI,
-        LSWI_min,
-        LSWI_max,
-        EVI,
-        PAR,
-        VPRM_veg_ID,
-        VEGFRA,
-    )
-    residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
-    return np.sum(residuals_GPP**2)
+    ####################################### define  functions #################################
 
+    def objective_function_VPRM_old_Reco(x):
+        Topt, PAR0, alpha, beta, lambd = x
+        GPP_VPRM, Reco_VPRM = VPRM_old(
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
 
-###########################################################################################
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
+        return np.sum(residuals_Reco**2)
 
-################################# loop over the sites #####################################
+    def objective_function_VPRM_old_GPP(x):
+        Topt, PAR0, alpha, beta, lambd = x
+        GPP_VPRM, Reco_VPRM = VPRM_old(
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
+        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
+        return np.sum(residuals_GPP**2)
 
-optimized_params_df_all = pd.DataFrame()
+    def objective_function_VPRM_new_Reco(x):
+        (
+            beta,
+            T_crit,
+            T_mult,
+            alpha1,
+            alpha2,
+            gamma,
+            theta1,
+            theta2,
+            theta3,
+        ) = x
+        Reco_VPRM = VPRM_new_only_Reco(
+            beta,
+            T_crit,
+            T_mult,
+            alpha1,
+            alpha2,
+            gamma,
+            theta1,
+            theta2,
+            theta3,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+        )
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
+        return np.sum(residuals_Reco**2)
 
-for folder in flx_folders:  # TODO: input folders from bash script to run them parallely
+    def objective_function_VPRM_new_GPP(x):
+        (
+            Topt,
+            PAR0,
+            lambd,
+        ) = x
+        GPP_VPRM = VPRM_new_only_GPP(
+            Topt,
+            PAR0,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
+        return np.sum(residuals_GPP**2)
+
+    ###########################################################################################
+
+    ################################# loop over the sites #####################################
+
+    optimized_params_df_all = pd.DataFrame()
+
     print(folder)
 
     site_name = "_".join(folder.split("_")[1:2])
@@ -287,16 +313,16 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         0, df_site_and_modis["LSWI"].min()
     )  # TODO: site-specific minimum LSWI across a full year  (from a multi-year mean), can it be below zero?
 
-    # Parameters initial guess
+    # Parameters are set constant for physical reason of no PSN above and below (true for the Alps)
     Tmin = 0
     Tmax = 45
-    Topt = 20.0
 
     #############################  first guess  of parameters #########################
+    Topt = 20.0
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
         VPRM_table_first_guess = {
-            "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
+            "PFT": ["ENF", "DBF", "MF", "OSH", "WET", "CRO", "GRA"],
             "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
             "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
             "lambda": [
@@ -748,8 +774,6 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
     )
 
     ########################## plot each site year ################################
-    # # TODO: plot the difference of parameters or some  other metric between sites?
-    # params_difference = original_params - result.x
     variables = [
         t_air,
         nee,
@@ -759,128 +783,155 @@ for folder in flx_folders:  # TODO: input folders from bash script to run them p
         "LSWI",
         "250m_16_days_EVI",
     ]
+    plot_site_year(
+        df_site_and_modis, timestamp, site_name, folder, base_path, variables
+    )
+    plot_measured_vs_modeled(
+        df_site_and_modis,
+        site_name,
+        folder,
+        base_path,
+        VPRM_old_or_new,
+        gpp,
+        r_eco,
+        nee,
+    )
 
-    df_site_and_modis.set_index(timestamp, inplace=True)
+    # variables = [
+    #     t_air,
+    #     nee,
+    #     gpp,
+    #     r_eco,
+    #     "PAR",
+    #     "LSWI",
+    #     "250m_16_days_EVI",
+    # ]
 
-    fig, axes = plt.subplots(
-        nrows=len(variables), ncols=1, figsize=(10, 6 * len(variables))
-    )
-    for i, var in enumerate(variables):
-        axes[i].plot(
-            df_site_and_modis.index,
-            df_site_and_modis[var],
-            label=var,
-            linestyle="",
-            marker="o",
-            markersize=1,
-        )
-        axes[i].set_xlabel("Date")
-        axes[i].set_ylabel(var)
-        axes[i].legend()
-        axes[i].grid(True)
-    axes[0].set_title(site_name + " - input data")
-    plt.tight_layout()
-    plt.savefig(
-        base_path + folder + "/" + site_name + "_check_input.eps",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close(fig)
+    # df_site_and_modis.set_index(timestamp, inplace=True)
 
-    # Plot measured vs. first guess for all years
-    fig, axes = plt.subplots(3, 1, figsize=(10, 18))
-    axes[0].plot(
-        df_site_and_modis.index,
-        df_site_and_modis[gpp],
-        label="Measured GPP",
-        color="blue",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[0].plot(
-        df_site_and_modis.index,
-        df_site_and_modis["GPP_VPRM_first_guess"],
-        label="Modeled GPP",
-        color="green",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[0].set_xlabel("Date")
-    axes[0].set_ylabel("GPP")
-    axes[0].set_title(site_name + " - Measured and Modeled GPP")
-    axes[0].legend()
-    axes[0].grid(True)
-    axes[1].plot(
-        df_site_and_modis.index,
-        df_site_and_modis[r_eco],
-        label="Measured Reco",
-        color="blue",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[1].plot(
-        df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM_first_guess"],
-        label="Modeled Reco",
-        color="green",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[1].set_xlabel("Date")
-    axes[1].set_ylabel(r_eco)
-    axes[1].set_title("Measured and Modeled Reco")
-    axes[1].legend()
-    axes[1].grid(True)
-    axes[2].plot(
-        df_site_and_modis.index,
-        df_site_and_modis[nee],
-        label="Measured NEE",
-        color="blue",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[2].plot(
-        df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM_first_guess"]
-        - df_site_and_modis["GPP_VPRM_first_guess"],
-        label="Modeled NEE",
-        color="green",
-        linestyle="",
-        marker="o",
-        markersize=1,
-    )
-    axes[2].set_xlabel("Date")
-    axes[2].set_ylabel(nee)
-    axes[2].set_title("Measured and Modeled NEE")
-    axes[2].legend()
-    axes[2].grid(True)
-    plt.tight_layout()
-    plt.savefig(
-        base_path
-        + folder
-        + "/"
-        + site_name
-        + "_fluxes_VPRM_"
-        + VPRM_old_or_new
-        + ".eps",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close(fig)
+    # fig, axes = plt.subplots(
+    #     nrows=len(variables), ncols=1, figsize=(10, 6 * len(variables))
+    # )
+    # for i, var in enumerate(variables):
+    #     axes[i].plot(
+    #         df_site_and_modis.index,
+    #         df_site_and_modis[var],
+    #         label=var,
+    #         linestyle="",
+    #         marker="o",
+    #         markersize=1,
+    #     )
+    #     axes[i].set_xlabel("Date")
+    #     axes[i].set_ylabel(var)
+    #     axes[i].legend()
+    #     axes[i].grid(True)
+    # axes[0].set_title(site_name + " - input data")
+    # plt.tight_layout()
+    # plt.savefig(
+    #     base_path + folder + "/" + site_name + "_check_input.eps",
+    #     dpi=300,
+    #     bbox_inches="tight",
+    # )
+    # plt.close(fig)
 
-write_all_to_excel(
-    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
-)
+    # # Plot measured vs. first guess for all years
+    # fig, axes = plt.subplots(3, 1, figsize=(10, 18))
+    # axes[0].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis[gpp],
+    #     label="Measured GPP",
+    #     color="blue",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[0].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis["GPP_VPRM_first_guess"],
+    #     label="Modeled GPP",
+    #     color="green",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[0].set_xlabel("Date")
+    # axes[0].set_ylabel("GPP")
+    # axes[0].set_title(site_name + " - Measured and Modeled GPP")
+    # axes[0].legend()
+    # axes[0].grid(True)
+    # axes[1].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis[r_eco],
+    #     label="Measured Reco",
+    #     color="blue",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[1].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis["Reco_VPRM_first_guess"],
+    #     label="Modeled Reco",
+    #     color="green",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[1].set_xlabel("Date")
+    # axes[1].set_ylabel(r_eco)
+    # axes[1].set_title("Measured and Modeled Reco")
+    # axes[1].legend()
+    # axes[1].grid(True)
+    # axes[2].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis[nee],
+    #     label="Measured NEE",
+    #     color="blue",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[2].plot(
+    #     df_site_and_modis.index,
+    #     df_site_and_modis["Reco_VPRM_first_guess"]
+    #     - df_site_and_modis["GPP_VPRM_first_guess"],
+    #     label="Modeled NEE",
+    #     color="green",
+    #     linestyle="",
+    #     marker="o",
+    #     markersize=1,
+    # )
+    # axes[2].set_xlabel("Date")
+    # axes[2].set_ylabel(nee)
+    # axes[2].set_title("Measured and Modeled NEE")
+    # axes[2].legend()
+    # axes[2].grid(True)
+    # plt.tight_layout()
+    # plt.savefig(
+    #     base_path
+    #     + folder
+    #     + "/"
+    #     + site_name
+    #     + "_fluxes_VPRM_"
+    #     + VPRM_old_or_new
+    #     + ".eps",
+    #     dpi=300,
+    #     bbox_inches="tight",
+    # )
+    # plt.close(fig)
 
-write_filtered_params_to_excel(
-    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
-)
+    # write_all_to_excel(
+    #     optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
+    # )
 
-boxplots_per_PFT_and_ID(
-    optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
-)
+    write_filtered_params_to_excel(
+        optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
+    )
+
+    boxplots_per_PFT_and_ID(
+        optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
+    )
+
+
+if __name__ == "__main__":
+    main()

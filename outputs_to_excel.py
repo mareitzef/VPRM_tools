@@ -21,26 +21,32 @@ def write_all_to_excel(
 def write_filtered_params_to_excel(
     optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
 ):
+    if VPRM_old_or_new == "new":
+        parameters_to_plot = [
+            "Topt",
+            "PAR0",
+            "lambd",
+            "alpha1",
+            "alpha2",
+            "beta",
+            "T_crit",
+            "T_mult",
+            "gamma",
+            "theta1",
+            "theta2",
+            "theta3",
+        ]
+    else:
+        parameters_to_plot = [
+            "Topt",
+            "PAR0",
+            "lambd",
+            "alpha",
+            "beta",
+        ]
 
-    parameters_to_plot = [
-        "Topt",
-        "PAR0",
-        "lambd",
-        "alpha1",
-        "alpha2",
-        "beta",
-        "T_crit",
-        "T_mult",
-        "gamma",
-        "theta1",
-        "theta2",
-        "theta3",
-    ]
-
-    # Create an empty DataFrame to store the filtered mean and median values
-    filtered_mean_median_df = pd.DataFrame(
-        columns=["PFT", "Parameter", "Filtered_Mean", "Filtered_Median"]
-    )
+    # Create an empty list to store the filtered mean and median values
+    filtered_mean_median_data = []
 
     # Group the data by PFT
     grouped = optimized_params_df_all.groupby("PFT")
@@ -62,16 +68,18 @@ def write_filtered_params_to_excel(
             filtered_mean = filtered_data[parameter].mean()
             filtered_median = filtered_data[parameter].median()
 
-            # Append the results to the DataFrame
-            filtered_mean_median_df = filtered_mean_median_df.append(
+            # Append the results to the list
+            filtered_mean_median_data.append(
                 {
                     "PFT": pft,
                     "Parameter": parameter,
                     "Filtered_Mean": filtered_mean,
                     "Filtered_Median": filtered_median,
-                },
-                ignore_index=True,
+                }
             )
+
+    # Create a DataFrame from the list of dictionaries
+    filtered_mean_median_df = pd.DataFrame(filtered_mean_median_data)
 
     # Save the DataFrame to an Excel file
     filtered_mean_median_df.to_excel(
