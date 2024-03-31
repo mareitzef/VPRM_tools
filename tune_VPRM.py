@@ -206,7 +206,7 @@ def main():
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
     df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
     df_site.set_index(timestamp, inplace=True)
-    modis_path = "/home/madse/Downloads/Fluxnet_Data/" + folder + "/"
+    modis_path = base_path + folder + "/"
 
     ##################################### Check data #########################################
 
