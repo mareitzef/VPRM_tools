@@ -754,6 +754,8 @@ def main():
         + "_"
         + target_pft
         + "_optimized_params_"
+        + VPRM_old_or_new
+        + "_"
         + opt_method
         + "_"
         + str(maxiter)
