@@ -8,11 +8,9 @@ from sklearn.metrics import r2_score, mean_squared_error
 from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
 from plots_for_VPRM import (
     plot_measured_vs_optimized_VPRM,
-    boxplots_per_PFT_and_ID,
     plot_site_year,
     plot_measured_vs_modeled,
 )
-from outputs_to_excel import write_filtered_params_to_excel, write_all_to_excel
 import argparse
 import sys
 
