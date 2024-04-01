@@ -21,7 +21,7 @@ import sys
 
 def main():
 
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
         parser = argparse.ArgumentParser(description="Description of your script")
         parser.add_argument("-p", "--base_path", type=str, help="Base path argument")
         parser.add_argument("-f", "--folder", type=str, help="Folder argument")
@@ -39,23 +39,13 @@ def main():
         opt_method = args.opt_method
         VPRM_old_or_new = args.VPRM_old_or_new
         folder = args.folder
-    else:
+    else:  # to run locally for single cases
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V2"  # "diff_evo_V2"
         VPRM_old_or_new = "old"  # "old","new"
         folder = "FLX_ES-Ln2_FLUXNET2015_FULLSET_2009-2009_1-4"
-        # folders = [
-        #     f
-        #     for f in os.listdir(base_path)
-        #     if os.path.isdir(os.path.join(base_path, f))
-        # ]
-        # flx_folders = [folder for folder in folders if folder.startswith("FLX_ES-Ln2")]
-
-        # if not flx_folders:
-        #     print("Warning - There is no input data")
-        #     raise SystemExit(0)
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_Alps_lat44-50_lon5-17.csv")
@@ -795,141 +785,6 @@ def main():
         gpp,
         r_eco,
         nee,
-    )
-
-    # variables = [
-    #     t_air,
-    #     nee,
-    #     gpp,
-    #     r_eco,
-    #     "PAR",
-    #     "LSWI",
-    #     "250m_16_days_EVI",
-    # ]
-
-    # df_site_and_modis.set_index(timestamp, inplace=True)
-
-    # fig, axes = plt.subplots(
-    #     nrows=len(variables), ncols=1, figsize=(10, 6 * len(variables))
-    # )
-    # for i, var in enumerate(variables):
-    #     axes[i].plot(
-    #         df_site_and_modis.index,
-    #         df_site_and_modis[var],
-    #         label=var,
-    #         linestyle="",
-    #         marker="o",
-    #         markersize=1,
-    #     )
-    #     axes[i].set_xlabel("Date")
-    #     axes[i].set_ylabel(var)
-    #     axes[i].legend()
-    #     axes[i].grid(True)
-    # axes[0].set_title(site_name + " - input data")
-    # plt.tight_layout()
-    # plt.savefig(
-    #     base_path + folder + "/" + site_name + "_check_input.eps",
-    #     dpi=300,
-    #     bbox_inches="tight",
-    # )
-    # plt.close(fig)
-
-    # # Plot measured vs. first guess for all years
-    # fig, axes = plt.subplots(3, 1, figsize=(10, 18))
-    # axes[0].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis[gpp],
-    #     label="Measured GPP",
-    #     color="blue",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[0].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis["GPP_VPRM_first_guess"],
-    #     label="Modeled GPP",
-    #     color="green",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[0].set_xlabel("Date")
-    # axes[0].set_ylabel("GPP")
-    # axes[0].set_title(site_name + " - Measured and Modeled GPP")
-    # axes[0].legend()
-    # axes[0].grid(True)
-    # axes[1].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis[r_eco],
-    #     label="Measured Reco",
-    #     color="blue",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[1].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis["Reco_VPRM_first_guess"],
-    #     label="Modeled Reco",
-    #     color="green",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[1].set_xlabel("Date")
-    # axes[1].set_ylabel(r_eco)
-    # axes[1].set_title("Measured and Modeled Reco")
-    # axes[1].legend()
-    # axes[1].grid(True)
-    # axes[2].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis[nee],
-    #     label="Measured NEE",
-    #     color="blue",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[2].plot(
-    #     df_site_and_modis.index,
-    #     df_site_and_modis["Reco_VPRM_first_guess"]
-    #     - df_site_and_modis["GPP_VPRM_first_guess"],
-    #     label="Modeled NEE",
-    #     color="green",
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    # )
-    # axes[2].set_xlabel("Date")
-    # axes[2].set_ylabel(nee)
-    # axes[2].set_title("Measured and Modeled NEE")
-    # axes[2].legend()
-    # axes[2].grid(True)
-    # plt.tight_layout()
-    # plt.savefig(
-    #     base_path
-    #     + folder
-    #     + "/"
-    #     + site_name
-    #     + "_fluxes_VPRM_"
-    #     + VPRM_old_or_new
-    #     + ".eps",
-    #     dpi=300,
-    #     bbox_inches="tight",
-    # )
-    # plt.close(fig)
-
-    # write_all_to_excel(
-    #     optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
-    # )
-
-    write_filtered_params_to_excel(
-        optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
-    )
-
-    boxplots_per_PFT_and_ID(
-        optimized_params_df_all, base_path, VPRM_old_or_new, opt_method, maxiter
     )
 
 
