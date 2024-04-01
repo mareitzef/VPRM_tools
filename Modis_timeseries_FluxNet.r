@@ -4,6 +4,18 @@ library(lubridate)
 library(stringr)
 library(readr)
 
+# Overall, this code automates the process of retrieving MODIS data for multiple sites within
+# specified date ranges and saving them for subsequent analysis.
+
+# - Reads a CSV file containing information about various sites, such as latitude and longitude.
+# - Defines a function convert_to_float to convert coordinates from string format to numeric format.
+# - Specifies a list of folders corresponding to different site datasets.
+# - Iterates through each folder to extract site-specific information such as name, latitude, and longitude.
+# - Creates a dataframe with site information.
+# - Fetches MODIS data for each site using the MODISTools package, extracting specific bands for
+# - vegetation indices and land surface water index (LSWI).
+# - Writes the extracted data to Excel files for further analysis.
+
 site_info <- read_csv("/home/madse/Downloads/Fluxnet_Data/site_info_Alps_lat44-50_lon5-17.csv", col_types = cols(lat = col_character(), lon = col_character()))
 
 convert_to_float <- function(coord) {

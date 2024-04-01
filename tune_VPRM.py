@@ -18,6 +18,16 @@ import sys
 
 
 def main():
+    """
+    This function serves as the main entry point for running the VPRM optimization process.
+    It accepts command-line arguments for specifying the base path, folder, maximum iteration,
+    optimization method, and VPRM version. If no arguments are provided, default values are used.
+    The script reads site information from a CSV file and iterates over each site folder to perform
+    VPRM optimization for each site-year combination. It retrieves FLUXNET and MODIS data,
+    preprocesses them, and initializes VPRM parameters based on the specified VPRM version.
+    Optimization is carried out using differential evolution algorithm. Results are saved
+    as Excel files, and plots are generated for visualization and analysis.
+    """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
         parser = argparse.ArgumentParser(description="Description of your script")
@@ -183,7 +193,7 @@ def main():
     timestamp = "TIMESTAMP_START"
     t_air = "TA_F"
     gpp = "GPP_DT_VUT_REF"
-    r_eco = "RECO_DT_VUT_REF"  # or should we use "RECO_NT_VUT_REF" for validation?
+    r_eco = "RECO_DT_VUT_REF"  # is just used for plotting and R2 out of interest
     nee = "NEE_VUT_REF"
     night = "NIGHT"
     nee_mean = "NEE_VUT_MEAN"
@@ -415,7 +425,7 @@ def main():
         theta2 = parameters["theta2"]
         theta3 = parameters["theta3"]
 
-    ###################### run VPRM with first Guess for comparison #######################
+    ###################### run VPRM with first Guess for comparison plot #################
     if VPRM_old_or_new == "old":
         GPP_VPRM, Reco_VPRM = VPRM_old(
             Topt,
@@ -480,22 +490,6 @@ def main():
         LSWI = df_year["LSWI"].reset_index(drop=True)
         EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
         PAR = df_year["PAR"].reset_index(drop=True)
-
-        if VPRM_old_or_new == "old":
-            initial_guess = [Topt, PAR0, alpha, beta, lambd]
-        elif VPRM_old_or_new == "new":
-            initial_guess_Reco = [
-                beta,
-                T_crit,
-                T_mult,
-                alpha1,
-                alpha2,
-                gamma,
-                theta1,
-                theta2,
-                theta3,
-            ]
-            initial_guess_GPP = [Topt, PAR0, lambd]
 
         ####################### Set bounds which are valid for all PFTs ################
         if VPRM_old_or_new == "old":
