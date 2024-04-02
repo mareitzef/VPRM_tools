@@ -53,7 +53,7 @@ def main():
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V2"  # "diff_evo_V2"
         VPRM_old_or_new = "old"  # "old","new"
-        folder = "FLX_ES-Ln2_FLUXNET2015_FULLSET_2009-2009_1-4"
+        folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_Alps_lat44-50_lon5-17.csv")
@@ -84,7 +84,7 @@ def main():
             VEGFRA,
         )
 
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee]) * df_year[night]
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_old_GPP(x):
@@ -162,7 +162,7 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
-        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee_mean] - Reco_VPRM_optimized_0)
+        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
         return np.sum(residuals_GPP**2)
 
     ###########################################################################################
@@ -291,6 +291,9 @@ def main():
         print(nan_sum)
 
     ############################# prepare input variables  #############################
+    # only the respiration of nee_mean is used
+    df_year.loc[df_year[nee_mean] < 0, nee_mean] = 0
+    # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
     ) / (df_site_and_modis["sur_refl_b02"] + df_site_and_modis["sur_refl_b06"])
@@ -639,10 +642,9 @@ def main():
             site_name,
             df_year,
             nee,
-            gpp,
+            nee_mean,
             df_year["GPP_VPRM_first_guess"],
             GPP_VPRM_optimized,
-            r_eco,
             df_year["Reco_VPRM_first_guess"],
             Reco_VPRM_optimized,
             base_path,

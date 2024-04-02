@@ -8,10 +8,9 @@ def plot_measured_vs_optimized_VPRM(
     site_name,
     df_year,
     nee,
-    gpp,
+    nee_mean,
     GPP_VPRM,
     GPP_VPRM_opt,
-    r_eco,
     Reco_VPRM,
     Reco_VPRM_opt,
     base_path,
@@ -25,49 +24,17 @@ def plot_measured_vs_optimized_VPRM(
 
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
 
-    # Plot comparison of GPP
+    # Plot comparison of Reco
     axes[0].plot(
-        df_year.index,
-        GPP_VPRM,
-        linestyle="",
-        marker="o",
-        markersize=1,
-        label="Modeled GPP",
-        color="green",
-    )
-    axes[0].plot(
-        df_year.index,
-        GPP_VPRM_opt,
-        linestyle="",
-        marker="o",
-        markersize=1,
-        label="Modeled GPP optimized",
-        color="red",
-    )
-    axes[0].plot(
-        df_year.index,
-        df_year[gpp],
-        linestyle="",
-        marker="o",
-        markersize=1,
-        label="Measured GPP",
-        color="blue",
-    )
-    axes[0].set_xlabel("Date")
-    axes[0].set_ylabel("GPP")
-    axes[0].set_title(site_name + " - Measured and Modeled GPP")
-    axes[0].legend()
-    axes[0].grid(True)
-    axes[1].plot(
         df_year.index,
         Reco_VPRM,
         linestyle="",
         marker="o",
         markersize=1,
-        label="Modeled Reco",
+        label="Modeled Reco first guess",
         color="green",
     )
-    axes[1].plot(
+    axes[0].plot(
         df_year.index,
         Reco_VPRM_opt,
         linestyle="",
@@ -76,20 +43,56 @@ def plot_measured_vs_optimized_VPRM(
         label="Modeled Reco optimized",
         color="red",
     )
-    axes[1].plot(
+    axes[0].plot(
         df_year.index,
-        df_year[r_eco],
+        df_year[nee_mean] * df_year["NIGHT"],
         linestyle="",
         marker="o",
         markersize=1,
-        label="Measured Reco",
+        label="Measured nighttime NEE MEAN",
+        color="blue",
+    )
+    axes[0].set_xlabel("Date")
+    axes[0].set_ylabel("Reco")
+    axes[0].set_title("Measured and Modeled Reco")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    # Plot comparison of GPP
+    axes[1].plot(
+        df_year.index,
+        GPP_VPRM,
+        linestyle="",
+        marker="o",
+        markersize=1,
+        label="Modeled GPP first guess",
+        color="green",
+    )
+    axes[1].plot(
+        df_year.index,
+        GPP_VPRM_opt,
+        linestyle="",
+        marker="o",
+        markersize=1,
+        label="Modeled GPP optimized",
+        color="red",
+    )
+    axes[1].plot(
+        df_year.index,
+        Reco_VPRM_opt - df_year[nee],
+        linestyle="",
+        marker="o",
+        markersize=1,
+        label="'Measured' GPP (NEE - Reco_modeled )",
         color="blue",
     )
     axes[1].set_xlabel("Date")
-    axes[1].set_ylabel("Reco")
-    axes[1].set_title("Measured and Modeled Reco")
+    axes[1].set_ylabel("GPP")
+    axes[1].set_title(site_name + " - Measured and Modeled GPP")
     axes[1].legend()
     axes[1].grid(True)
+
+    # Plot comparison of NEE
     axes[2].plot(
         df_year.index,
         Reco_VPRM - GPP_VPRM,
