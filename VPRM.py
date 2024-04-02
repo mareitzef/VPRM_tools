@@ -1,14 +1,5 @@
 import math
 
-# def calculate_tscale(t, t_min, t_max, t_opt):
-#     if t_min <= t <= t_max:
-#         value = ((t - t_min) * (t - t_max)) / (
-#             (t - t_min) * (t - t_max) - (t - t_opt) ** 2
-#         )
-#     else:
-#         value = 0
-#     return value if ((t - t_min) * (t - t_max) - (t - t_opt) ** 2 != 0) else 0
-
 
 def calculate_tscale(t, t_min, t_max, t_opt):
     if not math.isfinite(t):
@@ -103,6 +94,17 @@ def VPRM_old(
     Reco = [max(0, alpha * T2 + beta) for T2 in T2M]
 
     return GPP, Reco
+
+
+def VPRM_old_only_Reco(
+    alpha,
+    beta,
+    T2M,
+):
+
+    Reco = [max(0, alpha * T2 + beta) for T2 in T2M]
+
+    return Reco
 
 
 def VPRM_new(

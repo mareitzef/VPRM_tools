@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 def plot_measured_vs_optimized_VPRM(
     site_name,
+    timestamp,
     df_year,
     nee,
     nee_mean,
@@ -20,7 +21,7 @@ def plot_measured_vs_optimized_VPRM(
     opt_method,
     maxiter,
 ):
-    df_year.reset_index(drop=True, inplace=True)
+    df_year.set_index(timestamp, inplace=True)
 
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
 
@@ -77,9 +78,13 @@ def plot_measured_vs_optimized_VPRM(
         label="Modeled GPP optimized",
         color="red",
     )
+
+    df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_opt)
+    df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+
     axes[1].plot(
         df_year.index,
-        Reco_VPRM_opt - df_year[nee],
+        df_year["GPP_calc"],
         linestyle="",
         marker="o",
         markersize=1,

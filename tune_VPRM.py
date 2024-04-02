@@ -5,7 +5,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution
 from sklearn.metrics import r2_score, mean_squared_error
-from VPRM import VPRM_old, VPRM_new, VPRM_new_only_Reco, VPRM_new_only_GPP
+from VPRM import (
+    VPRM_old,
+    VPRM_old_only_Reco,
+    VPRM_new,
+    VPRM_new_only_Reco,
+    VPRM_new_only_GPP,
+)
 from plots_for_VPRM import (
     plot_measured_vs_optimized_VPRM,
     plot_site_year,
@@ -65,30 +71,18 @@ def main():
     ####################################### define  functions #################################
 
     def objective_function_VPRM_old_Reco(x):
-        Topt, PAR0, alpha, beta, lambd = x
-        GPP_VPRM, Reco_VPRM = VPRM_old(
-            Topt,
-            PAR0,
+        alpha, beta = x
+        Reco_VPRM = VPRM_old_only_Reco(
             alpha,
             beta,
-            lambd,
-            Tmin,
-            Tmax,
             T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VPRM_veg_ID,
-            VEGFRA,
         )
 
         residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_old_GPP(x):
-        Topt, PAR0, alpha, beta, lambd = x
+        Topt, PAR0, lambd = x
         GPP_VPRM, Reco_VPRM = VPRM_old(
             Topt,
             PAR0,
@@ -107,7 +101,8 @@ def main():
             VEGFRA,
         )
         # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
+        residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
+        del Reco_VPRM
         return np.sum(residuals_GPP**2)
 
     def objective_function_VPRM_new_Reco(x):
@@ -162,7 +157,8 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
-        residuals_GPP = np.array(GPP_VPRM) + (df_year[nee] - Reco_VPRM_optimized_0)
+
+        residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
         return np.sum(residuals_GPP**2)
 
     ###########################################################################################
@@ -503,6 +499,15 @@ def main():
                 (0.01, 6),  # Bounds for beta
                 (0, 1),  # Bounds for lambd
             ]
+            bounds_Reco = [
+                (0.01, 5),  # Bounds for alpha
+                (0.01, 6),  # Bounds for beta
+            ]
+            bounds_GPP = [
+                (0, 50),  # Bounds for Topt
+                (0, 6000),  # Bounds for PAR0
+                (0, 1),  # Bounds for lambd
+            ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
@@ -525,32 +530,41 @@ def main():
         if VPRM_old_or_new == "old":
             result = differential_evolution(
                 objective_function_VPRM_old_Reco,
-                bounds,
+                bounds_Reco,
                 maxiter=maxiter,  # Number of generations
                 disp=True,
             )
-            optimized_params_t = result.x
 
-            GPP_VPRM_optimized_0, Reco_VPRM_optimized_0 = VPRM_old(
-                *optimized_params_t,
-                Tmin,
-                Tmax,
+            [
+                alpha,
+                beta,
+            ] = result.x
+
+            Reco_VPRM_optimized_0 = VPRM_old_only_Reco(
+                alpha,
+                beta,
                 T2M,
-                LSWI,
-                LSWI_min,
-                LSWI_max,
-                EVI,
-                PAR,
-                VPRM_veg_ID,
-                VEGFRA,
             )
+
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+
             result = differential_evolution(
                 objective_function_VPRM_old_GPP,
-                bounds,
+                bounds_GPP,
                 maxiter=maxiter,  # Number of generations
                 disp=True,
             )
             optimized_params = result.x
+
+            [Topt, PAR0, lambd] = result.x
+            optimized_params = [
+                Topt,
+                PAR0,
+                alpha,
+                beta,
+                lambd,
+            ]
 
         elif VPRM_old_or_new == "new":
 
@@ -582,6 +596,8 @@ def main():
                 LSWI_max,
                 EVI,
             )
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
 
             result = differential_evolution(
                 objective_function_VPRM_new_GPP,
@@ -640,6 +656,7 @@ def main():
         ########################## plot the data ######################
         plot_measured_vs_optimized_VPRM(
             site_name,
+            timestamp,
             df_year,
             nee,
             nee_mean,
