@@ -14,7 +14,7 @@ for folder in "${folders[@]}"; do
     # Extract folder name from path
     folder_name=$(basename "$folder")
     # Create SLURM script for each job
-    cat <<EOF >"job_${folder_name}.sh"
+    cat <<EOF >"job_${folder_name}_${VPRM_old_or_new}.sh"
 #!/bin/bash
 #SBATCH --job-name=tune_VPRM_${folder_name}
 #SBATCH --ntasks=1
@@ -27,5 +27,5 @@ srun python tune_VPRM.py -p "$base_path" -f "$folder_name" -i "$maxiter" -m "$op
 EOF
 
     # Submit the job to the cluster
-    sbatch "job_${folder_name}.sh"
+    sbatch "job_${folder_name}_${VPRM_old_or_new}.sh"
 done
