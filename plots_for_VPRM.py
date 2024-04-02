@@ -266,9 +266,9 @@ def plot_measured_vs_modeled(
         + folder
         + "/"
         + site_name
-        + "_fluxes_VPRM_"
+        + "_first_guess_fluxes_VPRM_"
         + VPRM_old_or_new
-        + ".eps",
+        + "_all_years.eps",
         dpi=300,
         bbox_inches="tight",
     )
