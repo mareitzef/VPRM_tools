@@ -292,7 +292,7 @@ def main():
 
     ############################# prepare input variables  #############################
     # only the respiration of nee_mean is used
-    df_year.loc[df_year[nee_mean] < 0, nee_mean] = 0
+    df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = 0
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
