@@ -492,13 +492,6 @@ def main():
 
         ####################### Set bounds which are valid for all PFTs ################
         if VPRM_old_or_new == "old":
-            bounds = [
-                (0, 50),  # Bounds for Topt
-                (0, 6000),  # Bounds for PAR0
-                (0.01, 5),  # Bounds for alpha
-                (0.01, 6),  # Bounds for beta
-                (0, 1),  # Bounds for lambd
-            ]
             bounds_Reco = [
                 (0.01, 5),  # Bounds for alpha
                 (0.01, 6),  # Bounds for beta
@@ -506,13 +499,13 @@ def main():
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
                 (0, 6000),  # Bounds for PAR0
-                (0, 1),  # Bounds for lambd
+                (0, 0.4),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
-                (0, 1),  # Bounds for lambd
+                (0, 0.4),  # Bounds for lambd
             ]
             bounds_Reco = [
                 (0.01, 6),  # Bounds for beta
