@@ -62,7 +62,7 @@ def main():
         folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
-    site_info = pd.read_csv(base_path + "site_info_Alps_lat44-50_lon5-17.csv")
+    site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
     # Reco is optomized against NEE at night as it is measured directly
     # in FLUXNET Reco and GPP are seperated by a model
 
@@ -319,7 +319,7 @@ def main():
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
         VPRM_table_first_guess = {
-            "PFT": ["ENF", "DBF", "MF", "OSH", "WET", "CRO", "GRA"],
+            "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
             "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
             "PAR0": [270.2, 271.4, 236.6, 363.0, 579, 690.3, 229.1],
             "lambda": [
@@ -337,7 +337,7 @@ def main():
     ###################### table from Gourdji 2022 for VPRM_new ############################
     elif VPRM_old_or_new == "new":
         VPRM_table_first_guess = {
-            "PFT": ["DBF", "ENF", "MF", "OSH", "GRA", "WET", "CRO", "CRC"],
+            "PFT": ["DBF", "ENF", "MF", "SHB", "GRA", "WET", "CRO", "CRC"],
             "VPRM_veg_ID": [2, 1, 3, 4, 7, 5, 6, 8],
             "T_crit": [-15, 1, 0, 5, 11, 6, 7, -1],
             "T_mult": [0.55, 0.05, 0.05, 0.1, 0.1, 0.1, 0.05, 0],
