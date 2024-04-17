@@ -46,13 +46,6 @@ def main():
         parser.add_argument(
             "-v", "--VPRM_old_or_new", type=str, help="VPRM old or new argument"
         )
-        parser.add_argument(
-            "-s",
-            "--site_info_file",
-            type=str,
-            help="file name of site info - needs to be in base_path",
-        )
-
         args = parser.parse_args()
 
         base_path = args.base_path
@@ -60,8 +53,6 @@ def main():
         opt_method = args.opt_method
         VPRM_old_or_new = args.VPRM_old_or_new
         folder = args.folder
-        site_info_file = args.site_info_file
-        site_info = pd.read_csv(base_path + site_info_file)
     else:  # to run locally for single cases
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
@@ -69,10 +60,9 @@ def main():
         opt_method = "diff_evo_V2"  # "diff_evo_V2"
         VPRM_old_or_new = "new"  # "old","new"
         folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
-        site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
-
+    site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
     # Reco is optomized against NEE at night as it is measured directly
     # in FLUXNET Reco and GPP are seperated by a model
 
