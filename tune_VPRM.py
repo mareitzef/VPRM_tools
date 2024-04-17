@@ -310,6 +310,21 @@ def main():
         0, df_site_and_modis["LSWI"].min()
     )  # TODO: site-specific minimum LSWI across a full year  (from a multi-year mean), can it be below zero?
 
+    variables = [
+        nee,
+        nee_mean,
+        gpp,
+        r_eco,
+        t_air,
+        "PAR",
+        "LSWI",
+        "250m_16_days_EVI",
+    ]
+
+    plot_site_year(
+        df_site_and_modis, timestamp, site_name, folder, base_path, variables
+    )
+
     # Parameters are set constant for physical reason of no PSN above and below (true for the Alps)
     Tmin = 0
     Tmax = 45
@@ -499,13 +514,13 @@ def main():
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
                 (0, 6000),  # Bounds for PAR0
-                (0, 0.4),  # Bounds for lambd
+                (0.01, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
-                (0, 0.4),  # Bounds for lambd
+                (0.01, 1),  # Bounds for lambd
             ]
             bounds_Reco = [
                 (0.01, 6),  # Bounds for beta
@@ -720,8 +735,8 @@ def main():
                     "Year": [year],
                     "Topt": [optimized_params[0]],
                     "PAR0": [optimized_params[1]],
-                    "beta": [optimized_params[2]],
-                    "lambd": [optimized_params[3]],
+                    "lambd": [optimized_params[2]],
+                    "beta": [optimized_params[3]],
                     "T_crit": [optimized_params[4]],
                     "T_mult": [optimized_params[5]],
                     "alpha1": [optimized_params[6]],
@@ -770,18 +785,7 @@ def main():
     )
 
     ########################## plot each site year ################################
-    variables = [
-        t_air,
-        nee,
-        gpp,
-        r_eco,
-        "PAR",
-        "LSWI",
-        "250m_16_days_EVI",
-    ]
-    plot_site_year(
-        df_site_and_modis, timestamp, site_name, folder, base_path, variables
-    )
+
     plot_measured_vs_modeled(
         df_site_and_modis,
         site_name,

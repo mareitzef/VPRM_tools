@@ -160,11 +160,13 @@ def plot_site_year(
 
     df_site_and_modis.set_index(timestamp, inplace=True)
 
-    fig, axes = plt.subplots(
-        nrows=len(variables), ncols=1, figsize=(10, 6 * len(variables))
-    )
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(10, 20))
+
     for i, var in enumerate(variables):
-        axes[i].plot(
+        row_index = i // 2  # Calculate the row index
+        col_index = i % 2  # Calculate the column index
+
+        axes[row_index, col_index].plot(
             df_site_and_modis.index,
             df_site_and_modis[var],
             label=var,
@@ -172,11 +174,12 @@ def plot_site_year(
             marker="o",
             markersize=1,
         )
-        axes[i].set_xlabel("Date")
-        axes[i].set_ylabel(var)
-        axes[i].legend()
-        axes[i].grid(True)
-    axes[0].set_title(site_name + " - input data")
+        axes[row_index, col_index].set_xlabel("Date")
+        axes[row_index, col_index].set_ylabel(var)
+        axes[row_index, col_index].legend()
+        axes[row_index, col_index].grid(True)
+
+    axes[0, 0].set_title(site_name + " - input data")
     plt.tight_layout()
     plt.savefig(
         base_path + folder + "/" + site_name + "_check_input.eps",
