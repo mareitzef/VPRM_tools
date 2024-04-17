@@ -321,10 +321,6 @@ def main():
         "250m_16_days_EVI",
     ]
 
-    plot_site_year(
-        df_site_and_modis, timestamp, site_name, folder, base_path, variables
-    )
-
     # Parameters are set constant for physical reason of no PSN above and below (true for the Alps)
     Tmin = 0
     Tmax = 45
@@ -785,6 +781,10 @@ def main():
     )
 
     ########################## plot each site year ################################
+
+    plot_site_year(
+        df_site_and_modis, timestamp, site_name, folder, base_path, variables
+    )
 
     plot_measured_vs_modeled(
         df_site_and_modis,
