@@ -5,6 +5,7 @@ base_path="/scratch/c7071034/DATA/Fluxnet2015/Europe/"
 maxiter=100  # (default=100 takes ages)
 opt_method="diff_evo_V2"  # "diff_evo_V2"
 VPRM_old_or_new="new"  # "old","new"
+site_info_file="site_info_Alps_lat44-50_lon5-17.csv" # "site_info_Alps_lat44-50_lon5-17.csv" for alps, "site_info_all_FLUXNET2015.csv" for Europe
 
 # List of folders
 folders=($(find "$base_path" -type d -name "FLX_*"))
@@ -23,7 +24,7 @@ for folder in "${folders[@]}"; do
 #SBATCH --time=360
 
 module load python
-srun python tune_VPRM.py -p "$base_path" -f "$folder_name" -i "$maxiter" -m "$opt_method" -v "$VPRM_old_or_new"
+srun python tune_VPRM.py -p "$base_path" -f "$folder_name" -i "$maxiter" -m "$opt_method" -v "$VPRM_old_or_new" -s"$site_info_file"
 EOF
 
     # Submit the job to the cluster
