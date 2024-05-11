@@ -740,9 +740,6 @@ def main():
         NSE_NEE = calculate_NSE(
             df_year[nee], np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
         )
-        percent_of_sum = sum(
-            np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
-        ) / sum(df_year[nee])
 
         ########################## Save results to Excel ##########################
         if VPRM_old_or_new == "old":
@@ -765,7 +762,6 @@ def main():
                     "NSE_GPP": [NSE_GPP],
                     "NSE_Reco": [NSE_Reco],
                     "NSE_NEE": [NSE_NEE],
-                    "percent_NEE_sum": [percent_of_sum],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
                     "lon": [longitude],
@@ -799,7 +795,6 @@ def main():
                     "NSE_GPP": [NSE_GPP],
                     "NSE_Reco": [NSE_Reco],
                     "NSE_NEE": [NSE_NEE],
-                    "percent_NEE_sum": [percent_of_sum],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
                     "lon": [longitude],
