@@ -3,7 +3,7 @@
 # Define variables
 base_path="/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 maxiter=100  # (default=100 takes ages)
-opt_method="diff_evo_V2"  # "diff_evo_V2"
+opt_method="diff_evo_V3"  # "diff_evo_V2"
 VPRM_old_or_new="old"  # "old","new"
 
 # List of folders
