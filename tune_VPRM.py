@@ -191,11 +191,21 @@ def main():
     gpp = "GPP_DT_VUT_REF"
     r_eco = "RECO_DT_VUT_REF"  # is just used for plotting and R2 out of interest
     nee = "NEE_VUT_REF"
+    nee_qc = "NEE_VUT_REF_QC"
     night = "NIGHT"
-    nee_mean = "NEE_VUT_MEAN"
+    nee_mean = "NEE_VUT_REF_pos"
     # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
     sw_in = "SW_IN_F"
-    columns_to_copy = [timestamp, night, t_air, gpp, r_eco, nee, sw_in, nee_mean]
+    columns_to_copy = [
+        timestamp,
+        night,
+        t_air,
+        gpp,
+        r_eco,
+        nee,
+        sw_in,
+        # nee_mean, # TODO test the difference for NEE_VUT_MEAN
+    ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
     df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
@@ -214,13 +224,20 @@ def main():
     df_site.loc[df_site[t_air] < -40, t_air] = np.nan
     df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
 
-    df_site = df_site.rolling(window=3, min_periods=1).mean()
-    df_site_hour = df_site.resample("H").mean()
+    # Conversion factors
+    par_percentage_of_global = (
+        0.505  #  global radiation is proportional (0.505*PAR) to PAR(Mahadevan 2008)
+    )
+    # par_conversion_factor = 4.55  # Micromoles per joule TODO: where does this converstion factor come from?
 
-    df_site_hour["PAR"] = (
-        df_site_hour[sw_in] * 0.505
-    )  # assuming that PAR = 50.5% of globar radiation (Mahadevan 2008)
-    df_site_hour.drop(columns=[sw_in], inplace=True)
+    df_site["PAR"] = df_site[sw_in] / par_percentage_of_global
+    df_site.drop(columns=[sw_in], inplace=True)
+    # create extra column for daytime NEE
+    df_site[nee_mean] = df_site[nee]
+    # just use fluxnet qualities 0 and 1
+    df_site.loc[df_site[nee_qc] > 1, nee] = np.nan
+    # only the respiration of nee_mean is used
+    df_site.loc[df_site[nee_mean] < 0, nee_mean] = np.nan
 
     ##################################### read  MODIS data ##################################
 
@@ -266,14 +283,16 @@ def main():
     df_modis.loc[df_modis["sur_refl_b02"] < 0, "sur_refl_b02"] = np.nan
     df_modis.loc[df_modis["sur_refl_b06"] < 0, "sur_refl_b06"] = np.nan
     df_modis["250m_16_days_EVI"] = df_modis["250m_16_days_EVI"]
-    df_modis_hour = df_modis.resample("H").interpolate(method="linear")
-    df_modis_hour.reset_index(inplace=True)
-    df_modis_hour.rename(columns={"calendar_date": timestamp}, inplace=True)
-    df_modis_hour.set_index(timestamp, inplace=True)
+    df_modis_intp = df_modis.resample("30T").interpolate(
+        method="linear"
+    )  # TODO: create 30 min timeseries here
+    df_modis_intp.reset_index(inplace=True)
+    df_modis_intp.rename(columns={"calendar_date": timestamp}, inplace=True)
+    df_modis_intp.set_index(timestamp, inplace=True)
 
     # Perform inner join to keep only matching dates
     df_site_and_modis = pd.merge(
-        df_site_hour, df_modis_hour, left_index=True, right_index=True, how="inner"
+        df_site, df_modis_intp, left_index=True, right_index=True, how="inner"
     )
     df_site_and_modis.reset_index(inplace=True)
 
@@ -287,8 +306,6 @@ def main():
         print(nan_sum)
 
     ############################# prepare input variables  #############################
-    # only the respiration of nee_mean is used
-    df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = 0
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]

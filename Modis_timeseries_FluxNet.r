@@ -34,7 +34,7 @@ folders <- c(
     "FLX_DE-Spw_FLUXNET2015_FULLSET_2010-2014_1-4"
 )
 
-# folders for the Alps
+# folders for Europe
 # folders <- c(
 #     "FLX_BE-Bra_FLUXNET2015_FULLSET_1996-2014_2-4",
 #     "FLX_BE-Lon_FLUXNET2015_FULLSET_2004-2014_1-4",
