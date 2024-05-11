@@ -20,7 +20,30 @@ from plots_for_VPRM import (
 import argparse
 import sys
 
+
 ############################## base settings from parser #############################################
+def calculate_NSE(observed_values, predicted_values):
+    """
+    Calculate the Nash-Sutcliffe Efficiency (NSE).
+
+    Parameters:
+        observed_values (array-like): Observed values.
+        predicted_values (array-like): Predicted values.
+
+    Returns:
+        float: Nash-Sutcliffe Efficiency (NSE) value.
+    """
+    # Calculate mean of observed values
+    mean_observed = np.mean(observed_values)
+
+    # Calculate numerator and denominator for NSE
+    numerator = np.sum((observed_values - predicted_values) ** 2)
+    denominator = np.sum((observed_values - mean_observed) ** 2)
+
+    # Calculate NSE
+    NSE = 1 - (numerator / denominator)
+
+    return NSE
 
 
 def main():
@@ -204,6 +227,7 @@ def main():
         r_eco,
         nee,
         sw_in,
+        nee_qc,
         # nee_mean, # TODO test the difference for NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
@@ -711,6 +735,11 @@ def main():
                 np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
             )
         )
+        NSE_GPP = calculate_NSE(df_year[gpp], np.array(GPP_VPRM_optimized))
+        NSE_Reco = calculate_NSE(df_year[r_eco], np.array(Reco_VPRM_optimized))
+        NSE_NEE = calculate_NSE(
+            df_year[nee], np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
+        )
         percent_of_sum = sum(
             np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
         ) / sum(df_year[nee])
@@ -733,6 +762,9 @@ def main():
                     "RMSE_GPP": [rmse_GPP],
                     "RMSE_Reco": [rmse_Reco],
                     "RMSE_NEE": [rmse_NEE],
+                    "NSE_GPP": [NSE_GPP],
+                    "NSE_Reco": [NSE_Reco],
+                    "NSE_NEE": [NSE_NEE],
                     "percent_NEE_sum": [percent_of_sum],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
@@ -764,6 +796,9 @@ def main():
                     "RMSE_GPP": [rmse_GPP],
                     "RMSE_Reco": [rmse_Reco],
                     "RMSE_NEE": [rmse_NEE],
+                    "NSE_GPP": [NSE_GPP],
+                    "NSE_Reco": [NSE_Reco],
+                    "NSE_NEE": [NSE_NEE],
                     "percent_NEE_sum": [percent_of_sum],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
