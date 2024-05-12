@@ -80,8 +80,8 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V2"  # "diff_evo_V2"
-        VPRM_old_or_new = "new"  # "old","new"
+        opt_method = "diff_evo_V3"  # "diff_evo_V2"
+        VPRM_old_or_new = "old"  # "old","new"
         folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -216,7 +216,7 @@ def main():
     nee = "NEE_VUT_REF"
     nee_qc = "NEE_VUT_REF_QC"
     night = "NIGHT"
-    nee_mean = "NEE_VUT_REF_pos"
+    nee_mean = "NEE_VUT_MEAN"
     # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
     sw_in = "SW_IN_F"
     columns_to_copy = [
@@ -228,7 +228,7 @@ def main():
         nee,
         sw_in,
         nee_qc,
-        # nee_mean, # TODO test the difference for NEE_VUT_MEAN
+        nee_mean,  # TODO test the difference for NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
@@ -321,10 +321,10 @@ def main():
         print(nan_sum)
 
     ############################# prepare input variables  #############################
-    # just use fluxnet qualities 0 and 1
+    # just use fluxnet qualities 0 and 1 - new in V3
     df_site_and_modis.loc[df_site_and_modis[nee_qc] > 1, nee] = np.nan
     # create extra column for daytime NEE
-    df_site_and_modis[nee_mean] = df_site_and_modis[nee].copy()
+    # df_site_and_modis[nee_mean] = df_site_and_modis[nee].copy() # TODO: find the bug here, I want to use NEE_VUT_REF here
     # only the respiration of nee_mean is used
     df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = np.nan
     # calculate LSWI from MODIS Bands 2 and 6
@@ -547,7 +547,7 @@ def main():
             ]
             bounds_GPP = [
                 (0, 50),  # Bounds for Topt
-                (0, 6000),  # Bounds for PAR0
+                (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
@@ -714,28 +714,42 @@ def main():
             maxiter,
         )
         ########################## Calculate error measures ##########################
-        R2_GPP = r2_score(df_year[gpp], np.array(GPP_VPRM_optimized))
-        R2_Reco = r2_score(df_year[r_eco], np.array(Reco_VPRM_optimized))
-        R2_NEE = r2_score(
-            df_year[nee],
-            np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
+
+        mask = (
+            ~np.isnan(df_year[nee])
+            & ~np.isnan(Reco_VPRM_optimized)
+            & ~np.isnan(GPP_VPRM_optimized)
         )
+        R2_NEE = r2_score(
+            df_year[nee][mask],
+            np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
+        )
+
+        R2_GPP = r2_score(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
+        R2_Reco = r2_score(df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask])
+
         rmse_GPP = np.sqrt(
-            mean_squared_error(df_year[gpp], np.array(GPP_VPRM_optimized))
+            mean_squared_error(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
         )
         rmse_Reco = np.sqrt(
-            mean_squared_error(df_year[r_eco], np.array(Reco_VPRM_optimized))
+            mean_squared_error(
+                df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask]
+            )
         )
         rmse_NEE = np.sqrt(
             mean_squared_error(
-                df_year[nee],
-                np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized),
+                df_year[nee][mask],
+                np.array(Reco_VPRM_optimized)[mask]
+                - np.array(GPP_VPRM_optimized)[mask],
             )
         )
-        NSE_GPP = calculate_NSE(df_year[gpp], np.array(GPP_VPRM_optimized))
-        NSE_Reco = calculate_NSE(df_year[r_eco], np.array(Reco_VPRM_optimized))
+        NSE_GPP = calculate_NSE(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
+        NSE_Reco = calculate_NSE(
+            df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask]
+        )
         NSE_NEE = calculate_NSE(
-            df_year[nee], np.array(Reco_VPRM_optimized) - np.array(GPP_VPRM_optimized)
+            df_year[nee][mask],
+            np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
         )
 
         ########################## Save results to Excel ##########################
