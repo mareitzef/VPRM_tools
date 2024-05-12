@@ -253,12 +253,6 @@ def main():
 
     df_site["PAR"] = df_site[sw_in] / PAR_conversion
     df_site.drop(columns=[sw_in], inplace=True)
-    # just use fluxnet qualities 0 and 1
-    df_site.loc[df_site[nee_qc] > 1, nee] = np.nan
-    # create extra column for daytime NEE
-    df_site[nee_mean] = df_site[nee].copy()
-    # only the respiration of nee_mean is used
-    df_site.loc[df_site[nee_mean] < 0, nee_mean] = np.nan
 
     ##################################### read  MODIS data ##################################
 
@@ -327,6 +321,12 @@ def main():
         print(nan_sum)
 
     ############################# prepare input variables  #############################
+    # just use fluxnet qualities 0 and 1
+    df_site_and_modis.loc[df_site_and_modis[nee_qc] > 1, nee] = np.nan
+    # create extra column for daytime NEE
+    df_site_and_modis[nee_mean] = df_site_and_modis[nee].copy()
+    # only the respiration of nee_mean is used
+    df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = np.nan
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
