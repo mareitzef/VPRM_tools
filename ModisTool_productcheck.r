@@ -10,6 +10,6 @@ product <- "MCD15A3H"
 products <- mt_products()
 head(products)
 bands <- mt_bands(product)
-head(bands)
+bands
 # dates <- mt_dates(product = product, lat, lon)
 # head(dates)

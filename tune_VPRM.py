@@ -249,17 +249,14 @@ def main():
     df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
 
     # Conversion factors
-    par_percentage_of_global = (
-        0.505  #  global radiation is proportional (0.505*PAR) to PAR(Mahadevan 2008)
-    )
-    # par_conversion_factor = 4.55  # Micromoles per joule TODO: where does this converstion factor come from?
+    PAR_conversion = 0.505  #  global radiation is proportional to PAR (Rg = 0.505*PAR - Mahadevan 2008)
 
-    df_site["PAR"] = df_site[sw_in] / par_percentage_of_global
+    df_site["PAR"] = df_site[sw_in] / PAR_conversion
     df_site.drop(columns=[sw_in], inplace=True)
-    # create extra column for daytime NEE
-    df_site[nee_mean] = df_site[nee]
     # just use fluxnet qualities 0 and 1
     df_site.loc[df_site[nee_qc] > 1, nee] = np.nan
+    # create extra column for daytime NEE
+    df_site[nee_mean] = df_site[nee].copy()
     # only the respiration of nee_mean is used
     df_site.loc[df_site[nee_mean] < 0, nee_mean] = np.nan
 

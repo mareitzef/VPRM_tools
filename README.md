@@ -1,6 +1,7 @@
 # VPRM_tools
 
-## get FLUXNET2015 data
+#### get FLUXNET2015 data
+download from https://fluxnet.org/data/fluxnet2015-dataset/
 
 #### get MODIS timeseries by running Modis_timeseries_FluxNet.r in R
 Rscript Modis_timeseries_FluxNet.r
@@ -16,19 +17,20 @@ scp FLX_AT-Mie_files.zip c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet
 ### on LEO5
 leo5
 cdflx
-zip_filename="Europe_VPRM_old_optimized_params_diff_evo_V2_100.zip"
+
+zip_filename="Alps_VPRM_optimized_params_diff_evo_V3_100.zip"
 #### zip VPRM files
-zip -r $zip_filename $(find . -type f \( -name '*optimized_params_new_diff_evo_V2_100.xlsx' -o -name "*old*100.eps" -o -name "*check_input.eps" \) )
-#### whithout plots
-zip -r $zip_filename $(find . -type f \( -name '*optimized_params_old_diff_evo_V2_100.xlsx'  \) )
+#zip -r $zip_filename $(find . -type f \( -name '*optimized_params_new_diff_evo_V2_100.xlsx' -o -name "*old*100.eps" -o -name "*check_input.eps" \) )
+#### whithout plots but old an new
+zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V3_100.xlsx'  \) )
 
 ### local
 #### download zip VPRM files
-zip_filename="Europe_VPRM_old_optimized_params_diff_evo_V2_100.zip"
+zip_filename="Alps_VPRM_optimized_params_diff_evo_V3_100.zip"
 scp c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet2015/$zip_filename .
 unzip $zip_filename
 
-then copy folders from Alps into Europe
+#### then copy folders from Alps into Europe
 
 ### plot data with 
 plots_for_VPRM_from_excel.ipynb
