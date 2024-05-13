@@ -46,6 +46,22 @@ def calculate_NSE(observed_values, predicted_values):
     return NSE
 
 
+def calculate_AIC(n, mse, k):
+    """
+    Calculate Akaike Information Criterion (AIC).
+
+    Parameters:
+    - n: Number of data points.
+    - mse: Mean squared error of the model.
+    - k: Number of parameters in the model.
+
+    Returns:
+    - AIC value.
+    """
+    AIC = 2 * k - np.log(mse) + 2 * k * (k + 1) / (n - k - 1)
+    return AIC
+
+
 def main():
     """
     This function serves as the main entry point for running the VPRM optimization process.
@@ -81,7 +97,7 @@ def main():
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V4"  # "diff_evo_V2"
-        VPRM_old_or_new = "old"  # "old","new"
+        VPRM_old_or_new = "new"  # "old","new"
         folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -745,10 +761,7 @@ def main():
                 - np.array(GPP_VPRM_optimized)[mask],
             )
         )
-        NSE_GPP = calculate_NSE(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
-        NSE_Reco = calculate_NSE(
-            df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask]
-        )
+
         NSE_NEE = calculate_NSE(
             df_year[nee][mask],
             np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
@@ -756,6 +769,10 @@ def main():
 
         ########################## Save results to Excel ##########################
         if VPRM_old_or_new == "old":
+            # Calculate AIC for the old model
+            AIC = calculate_AIC(
+                17520, rmse_NEE**2, 5
+            )  # Assuming 5 parameters for the old model
             data_to_append = pd.DataFrame(
                 {
                     "site_ID": [site_name],
@@ -772,8 +789,7 @@ def main():
                     "RMSE_GPP": [rmse_GPP],
                     "RMSE_Reco": [rmse_Reco],
                     "RMSE_NEE": [rmse_NEE],
-                    "NSE_GPP": [NSE_GPP],
-                    "NSE_Reco": [NSE_Reco],
+                    "AIC": [AIC],
                     "NSE_NEE": [NSE_NEE],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
@@ -782,6 +798,10 @@ def main():
                 }
             )
         elif VPRM_old_or_new == "new":
+            # Calculate AIC for the new model
+            AIC = calculate_AIC(
+                17520, rmse_NEE**2, 12
+            )  # Assuming 5 parameters for the new model
             data_to_append = pd.DataFrame(
                 {
                     "site_ID": [site_name],
@@ -805,8 +825,7 @@ def main():
                     "RMSE_GPP": [rmse_GPP],
                     "RMSE_Reco": [rmse_Reco],
                     "RMSE_NEE": [rmse_NEE],
-                    "NSE_GPP": [NSE_GPP],
-                    "NSE_Reco": [NSE_Reco],
+                    "AIC": [AIC],
                     "NSE_NEE": [NSE_NEE],
                     "T_mean": [df_year[t_air].mean()],
                     "lat": [latitude],
