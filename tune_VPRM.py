@@ -19,31 +19,32 @@ from plots_for_VPRM import (
 )
 import argparse
 import sys
+import hydroeval as he
 
 
 ############################## base settings from parser #############################################
-def calculate_NSE(observed_values, predicted_values):
-    """
-    Calculate the Nash-Sutcliffe Efficiency (NSE).
+# def calculate_NSE(observed_values, predicted_values):
+#     """
+#     Calculate the Nash-Sutcliffe Efficiency (NSE).
 
-    Parameters:
-        observed_values (array-like): Observed values.
-        predicted_values (array-like): Predicted values.
+#     Parameters:
+#         observed_values (array-like): Observed values.
+#         predicted_values (array-like): Predicted values.
 
-    Returns:
-        float: Nash-Sutcliffe Efficiency (NSE) value.
-    """
-    # Calculate mean of observed values
-    mean_observed = np.mean(observed_values)
+#     Returns:
+#         float: Nash-Sutcliffe Efficiency (NSE) value.
+#     """
+#     # Calculate mean of observed values
+#     mean_observed = np.mean(observed_values)
 
-    # Calculate numerator and denominator for NSE
-    numerator = np.sum((observed_values - predicted_values) ** 2)
-    denominator = np.sum((observed_values - mean_observed) ** 2)
+#     # Calculate numerator and denominator for NSE
+#     numerator = np.sum((observed_values - predicted_values) ** 2)
+#     denominator = np.sum((observed_values - mean_observed) ** 2)
 
-    # Calculate NSE
-    NSE = 1 - (numerator / denominator)
+#     # Calculate NSE
+#     NSE = 1 - (numerator / denominator)
 
-    return NSE
+#     return NSE
 
 
 def calculate_AIC(n, mse, k):
@@ -766,9 +767,10 @@ def main():
             )
         )
 
-        NSE_NEE = calculate_NSE(
-            df_year[nee][mask],
+        NSE_NEE = he.evaluator(
+            he.nse,
             np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
+            df_year[nee][mask],
         )
 
         ########################## Save results to Excel ##########################
