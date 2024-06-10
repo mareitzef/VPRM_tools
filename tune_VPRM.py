@@ -97,7 +97,7 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V4"  # "diff_evo_V2"
+        opt_method = "diff_evo_V5"  # version of deff evo
         VPRM_old_or_new = "new"  # "old","new"
         folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
 
@@ -225,18 +225,27 @@ def main():
         i += 1
 
     ############################### Read FLUXNET Data ##############################################
-
+    Xut_method = "CUT"  # VUT or CUT method
     timestamp = "TIMESTAMP_START"
     t_air = "TA_F"  # Air temperature, consolidated from TA_F_MDS and TA_ERA
-    gpp = "GPP_DT_VUT_REF"  # Gross Primary Production, from Daytime partitioning method, reference selected from GPP versions using model efficiency (MEF).
-    r_eco = "RECO_DT_VUT_REF"  # is just used for plotting and R2 out of interest
-    nee = "NEE_VUT_REF"  # Net Ecosystem Exchange, using Variable Ustar Threshold (VUT) for each year, reference selected on the basis of the model efficiency (MEF).
-    nee_qc = "NEE_VUT_REF_QC"  # Quality flag for NEE_VUT_REF
-    nee_randunc = "NEE_VUT_REF_RANDUNC"  # Random uncertainty for NEE_VUT_REF, from measured only data
-    nee_jointunc = "NEE_VUT_REF_JOINTUNC"  # Joint uncertainty estimation for NEE_VUT_REF, including random uncertainty and USTAR filtering uncertainty
+    gpp = (
+        "GPP_DT_" + Xut_method + "_REF"
+    )  # Gross Primary Production, from Daytime partitioning method, reference selected from GPP versions using model efficiency (MEF).
+    r_eco = (
+        "RECO_DT_" + Xut_method + "_REF"
+    )  # is just used for plotting and R2 out of interest
+    nee = (
+        "NEE_" + Xut_method + "_REF"
+    )  # Net Ecosystem Exchange, using Variable Ustar Threshold (VUT) for each year, reference selected on the basis of the model efficiency (MEF).
+    nee_qc = "NEE_" + Xut_method + "_REF_QC"  # Quality flag for NEE_VUT_REF
+    nee_randunc = (
+        "NEE_" + Xut_method + "_REF_RANDUNC"
+    )  # Random uncertainty for NEE_VUT_REF, from measured only data
+    nee_jointunc = (
+        "NEE_" + Xut_method + "_REF_JOINTUNC"
+    )  # Joint uncertainty estimation for NEE_VUT_REF, including random uncertainty and USTAR filtering uncertainty
     night = "NIGHT"  # flag for nighttime
-    nee_mean = "NEE_VUT_REF_pos"  # only positive values from NEE_VUT_REF
-    # TODO test: nee_cut = 'NEE_CUT_REF' and 'nee = 'NEE_VUT_REF''
+    nee_mean = "NEE_" + Xut_method + "_REF_pos"  # only positive values from NEE_VUT_REF
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
         timestamp,
