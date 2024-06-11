@@ -3,8 +3,8 @@
 # Define variables
 base_path="/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 maxiter=100  # (default=100 takes ages)
-opt_method="diff_evo_V5"  # "diff_evo_V2"
-VPRM_old_or_new="old"  # "old","new"
+opt_method="diff_evo_V6"  # "diff_evo_V2"
+VPRM_old_or_new="new"  # "old","new"
 
 # List of folders
 folders=($(find "$base_path" -type d -name "FLX_*"))
