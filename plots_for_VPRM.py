@@ -22,6 +22,7 @@ def plot_measured_vs_optimized_VPRM(
     maxiter,
 ):
     df_year.set_index(timestamp, inplace=True)
+    font_size = 14
 
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
 
@@ -53,11 +54,12 @@ def plot_measured_vs_optimized_VPRM(
         label="Modeled Reco optimized",
         color="red",
     )
-    axes[0].set_xlabel("Date")
-    axes[0].set_ylabel("Reco")
-    axes[0].set_title("Measured and Modeled Reco")
-    axes[0].legend()
+    axes[0].set_xlabel("Date", fontsize=font_size + 2)
+    axes[0].set_ylabel("Reco", fontsize=font_size + 2)
+    axes[0].set_title("Measured and Modeled Reco", fontsize=font_size + 2)
+    axes[0].legend(fontsize=font_size)
     axes[0].grid(True)
+    axes[0].tick_params(axis="both", which="major", labelsize=font_size)
 
     # Plot comparison of GPP
     axes[1].plot(
@@ -92,11 +94,12 @@ def plot_measured_vs_optimized_VPRM(
         label="Modeled GPP optimized",
         color="red",
     )
-    axes[1].set_xlabel("Date")
-    axes[1].set_ylabel("GPP")
-    axes[1].set_title(site_name + " - Measured and Modeled GPP")
-    axes[1].legend()
+    axes[1].set_xlabel("Date", fontsize=font_size + 2)
+    axes[1].set_ylabel("GPP", fontsize=font_size + 2)
+    axes[1].set_title(site_name + " - Measured and Modeled GPP", fontsize=font_size + 2)
+    axes[1].legend(fontsize=font_size)
     axes[1].grid(True)
+    axes[1].tick_params(axis="both", which="major", labelsize=font_size)
 
     # Plot comparison of NEE
     axes[2].plot(
@@ -126,11 +129,12 @@ def plot_measured_vs_optimized_VPRM(
         label="Modeled NEE optimized",
         color="red",
     )
-    axes[2].set_xlabel("Date")
-    axes[2].set_ylabel("NEE")
-    axes[2].set_title("Measured and Modeled NEE")
-    axes[2].legend()
+    axes[2].set_xlabel("Date", fontsize=font_size + 2)
+    axes[2].set_ylabel("NEE", fontsize=font_size + 2)
+    axes[2].set_title("Measured and Modeled NEE", fontsize=font_size + 2)
+    axes[2].legend(fontsize=font_size)
     axes[2].grid(True)
+    axes[2].tick_params(axis="both", which="major", labelsize=font_size)
     plt.tight_layout()
 
     plt.savefig(
@@ -155,14 +159,14 @@ def plot_measured_vs_optimized_VPRM(
     return
 
 
-def plot_site_year(
+def plot_site_input(
     df_site_and_modis, timestamp, site_name, folder, base_path, variables
 ):
 
     df_site_and_modis.set_index(timestamp, inplace=True)
+    font_size = 14
 
     fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(10, 20))
-
     for i, var in enumerate(variables):
         row_index = i // 2  # Calculate the row index
         col_index = i % 2  # Calculate the column index
@@ -175,12 +179,15 @@ def plot_site_year(
             marker="o",
             markersize=1,
         )
-        axes[row_index, col_index].set_xlabel("Date")
-        axes[row_index, col_index].set_ylabel(var)
-        axes[row_index, col_index].legend()
+        axes[row_index, col_index].set_xlabel("Date", fontsize=font_size + 2)
+        axes[row_index, col_index].set_ylabel(var, fontsize=font_size + 2)
+        axes[row_index, col_index].legend(fontsize=font_size)
         axes[row_index, col_index].grid(True)
+        axes[row_index, col_index].tick_params(
+            axis="both", which="major", labelsize=font_size
+        )
 
-    axes[0, 0].set_title(site_name + " - input data")
+    axes[0, 0].set_title(site_name + " - input data", fontsize=font_size + 2)
     plt.tight_layout()
     plt.savefig(
         base_path + folder + "/" + site_name + "_check_input.eps",
@@ -193,6 +200,7 @@ def plot_site_year(
 def plot_measured_vs_modeled(
     df_site_and_modis, site_name, folder, base_path, VPRM_old_or_new, gpp, r_eco, nee
 ):
+    font_size = 14
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
     axes[0].plot(
         df_site_and_modis.index,
@@ -212,10 +220,11 @@ def plot_measured_vs_modeled(
         marker="o",
         markersize=1,
     )
-    axes[0].set_xlabel("Date")
-    axes[0].set_ylabel("GPP")
-    axes[0].set_title(site_name + " - Measured and Modeled GPP")
-    axes[0].legend()
+    axes[0].set_xlabel("Date", fontsize=font_size + 2)
+    axes[0].set_ylabel("GPP", fontsize=font_size + 2)
+    axes[0].set_title(site_name + " - Measured and Modeled GPP", fontsize=font_size + 2)
+    axes[0].legend(fontsize=font_size)
+    axes[0].tick_params(axis="both", which="major", labelsize=font_size)
     axes[0].grid(True)
     axes[1].plot(
         df_site_and_modis.index,
@@ -235,10 +244,11 @@ def plot_measured_vs_modeled(
         marker="o",
         markersize=1,
     )
-    axes[1].set_xlabel("Date")
-    axes[1].set_ylabel("Reco")
-    axes[1].set_title("Measured and Modeled Reco")
-    axes[1].legend()
+    axes[1].set_xlabel("Date", fontsize=font_size + 2)
+    axes[1].set_ylabel("Reco", fontsize=font_size + 2)
+    axes[1].set_title("Measured and Modeled Reco", fontsize=font_size + 2)
+    axes[1].tick_params(axis="both", which="major", labelsize=font_size)
+    axes[1].legend(fontsize=font_size)
     axes[1].grid(True)
     axes[2].plot(
         df_site_and_modis.index,
@@ -259,10 +269,11 @@ def plot_measured_vs_modeled(
         marker="o",
         markersize=1,
     )
-    axes[2].set_xlabel("Date")
-    axes[2].set_ylabel("NEE")
-    axes[2].set_title("Measured and Modeled NEE")
-    axes[2].legend()
+    axes[2].set_xlabel("Date", fontsize=font_size + 2)
+    axes[2].set_ylabel("NEE", fontsize=font_size + 2)
+    axes[2].set_title("Measured and Modeled NEE", fontsize=font_size + 2)
+    axes[2].tick_params(axis="both", which="major", labelsize=font_size)
+    axes[2].legend(fontsize=font_size)
     axes[2].grid(True)
     plt.tight_layout()
     plt.savefig(

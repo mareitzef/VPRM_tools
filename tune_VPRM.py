@@ -14,7 +14,7 @@ from VPRM import (
 )
 from plots_for_VPRM import (
     plot_measured_vs_optimized_VPRM,
-    plot_site_year,
+    plot_site_input,
     plot_measured_vs_modeled,
 )
 import argparse
@@ -103,9 +103,9 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V6"  # version of deff evo
-        VPRM_old_or_new = "new"  # "old","new"
-        folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
+        opt_method = "diff_evo_V7"  # version of deff evo
+        VPRM_old_or_new = "old"  # "old","new"
+        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -225,6 +225,10 @@ def main():
     for site_i in site_info["site"]:
         if site_name == site_i:
             target_pft = site_info["pft"][i]
+            if target_pft == "EBF":
+                target_pft = "DBF"  # TODO check OSH
+            if target_pft == "OSH":
+                target_pft = "SHB"
             latitude = site_info["lat"][i].replace(",", ".")
             longitude = site_info["lon"][i].replace(",", ".")
             elevation = site_info["elev"][i]
@@ -252,8 +256,12 @@ def main():
     )  # Joint uncertainty estimation for NEE_VUT_REF, including random uncertainty and USTAR filtering uncertainty
     night = "NIGHT"  # flag for nighttime
 
-    # nee_mean = "NEE_" + XUT + "_REF_pos"  # only positive values from NEE_VUT_REF # TODO: uncomment for using NEE_VUT_REF
-    nee_mean = "NEE_" + XUT + "_MEAN"  # TODO: test if NEE_VUT_MEAN hat better R2
+    # nee_mean = (
+    #     "NEE_" + XUT + "_REF_pos"
+    # )  # only positive values from NEE_VUT_REF # TODO: uncomment for using NEE_VUT_REF
+    # test for "RECO_DT_" + XUT + "_REF"
+    nee_mean = r_eco
+    # nee_mean = "NEE_" + XUT + "_MEAN"  # TODO: test if NEE_VUT_MEAN hat better R2
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
         timestamp,
@@ -266,7 +274,7 @@ def main():
         nee_qc,
         nee_randunc,
         nee_jointunc,
-        nee_mean,  # TODO quantify the difference for NEE_VUT_MEAN
+        # nee_mean,  # TODO uncomment for using NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
@@ -362,14 +370,11 @@ def main():
     # just use fluxnet qualities 0 and 1 - new in V3
     df_site_and_modis.loc[df_site_and_modis[nee_qc] > 1, nee] = np.nan
     # create extra column for daytime NEE
+    # TODO uncomment next 3 lines, if using NEE_VUT_REF - make automatic if needed later..
+    # df_site_and_modis[nee_mean] = df_site_and_modis[nee].copy()
+    # # only the respiration of nee_mean is used
+    # df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = np.nan
 
-    # TODO uncomment next 3 lines, if using NEE_VUT_REF
-    # df_site_and_modis[nee_mean] = df_site_and_modis[
-    #     nee
-    # ].copy()
-
-    # only the respiration of nee_mean is used
-    df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = np.nan
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
@@ -389,7 +394,7 @@ def main():
     LSWI_max = max_lswi_by_year.max()
     LSWI_min = max(
         0, df_site_and_modis["LSWI"].min()
-    )  # TODO: site-specific minimum LSWI across a full year  (from a multi-year mean), can it be below zero?
+    )  # TODO: site-specific minimum LSWI across a full year  (from a multi-year mean)
 
     variables = [
         nee,
@@ -407,7 +412,7 @@ def main():
     Tmax = 45
 
     #############################  first guess  of parameters #########################
-    Topt = 20.0
+    # Topt = 20.0  # T_opt is now defined below as  T_mean - 5
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
         VPRM_table_first_guess = {
@@ -496,6 +501,9 @@ def main():
     parameters = df_VPRM_table_first_guess[
         df_VPRM_table_first_guess["PFT"] == target_pft
     ].iloc[0]
+    Topt = (
+        df_site_and_modis[t_air].mean() - 5
+    )  # estimate  T_mean here to set furst Guess o T_opt
     if VPRM_old_or_new == "old":
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
@@ -570,6 +578,7 @@ def main():
     start_year = df_site_and_modis[timestamp].dt.year.min()
     end_year = df_site_and_modis[timestamp].dt.year.max() + 1
 
+    # for year in range(start_year, start_year + 3):  # TODO: set years here manually
     for year in range(start_year, end_year):
         # Filter data for the current year
         df_year = df_site_and_modis[
@@ -581,6 +590,9 @@ def main():
         LSWI = df_year["LSWI"].reset_index(drop=True)
         EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
         PAR = df_year["PAR"].reset_index(drop=True)
+        Topt = (
+            df_year[t_air].mean() - 5
+        )  # estimate  T_mean here to set furst Guess o T_opt
 
         ####################### Set bounds which are valid for all PFTs ################
         if VPRM_old_or_new == "old":
@@ -589,13 +601,13 @@ def main():
                 (0.01, 6),  # Bounds for beta
             ]
             bounds_GPP = [
-                (0, 50),  # Bounds for Topt
+                (-5, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
-                (0, 50),  # Bounds for Topt
+                (-5, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
@@ -630,9 +642,10 @@ def main():
                 beta,
                 T2M,
             )
-
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
-            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            # TODO make swith here if GPP_calc is needed
+            # df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            df_year["GPP_calc"] = df_year[gpp]
 
             result = differential_evolution(
                 objective_function_VPRM_old_GPP,
@@ -896,7 +909,7 @@ def main():
 
     ########################## plot each site year ################################
 
-    plot_site_year(
+    plot_site_input(
         df_site_and_modis, timestamp, site_name, folder, base_path, variables
     )
 

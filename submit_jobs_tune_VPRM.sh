@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Define variables
-base_path="/scratch/c7071034/DATA/Fluxnet2015/Alps/"
+base_path="/scratch/c7071034/DATA/Fluxnet2015/Europe/"
 maxiter=100  # (default=100 takes ages)
-opt_method="diff_evo_V6"  # "diff_evo_V2"
+opt_method="diff_evo_V7"  # "diff_evo_V2"
 VPRM_old_or_new="new"  # "old","new"
 
 # List of folders

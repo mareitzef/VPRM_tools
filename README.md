@@ -36,6 +36,10 @@ unzip $zip_filename
 plots_for_VPRM_from_excel.ipynb
 plot_VPRM_literature.ipynb
 
+#### convert png to eps
+gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -r600 -sOutputFile=IT-Tor_opt_fluxes_VPRM_new_2012_diff_evo_V2_100.png IT-Tor_opt_fluxes_VPRM_new_2012_diff_evo_V2_100.eps
+
 #### git stuff
 ##### delete local change e.g.:
 git checkout -- submit_jobs_tune_VPRM.sh
+
