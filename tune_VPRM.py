@@ -79,6 +79,8 @@ def main():
     V4 - final version
     V5 - using CUT instead of VUT method
     V6 - testing NEE_VUT_MEAN for Reco calibration
+    V7 - with RECO and GPP FLUXNET tuning and impvoed plots and testing lower boundary of T_opt till -5
+    V8 - drop years with not enough data and removed uncertainty again and still uning RECO and GPP FLUXNET tuning
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -103,9 +105,9 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V7"  # version of deff evo
+        opt_method = "diff_evo_V8"  # version of deff evo
         VPRM_old_or_new = "old"  # "old","new"
-        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
+        folder = "FLX_IT-Col_FLUXNET2015_FULLSET_1996-2014_1-4"
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -248,12 +250,6 @@ def main():
         "NEE_" + XUT + "_REF"
     )  # Net Ecosystem Exchange, using Variable Ustar Threshold (VUT) for each year, reference selected on the basis of the model efficiency (MEF).
     nee_qc = "NEE_" + XUT + "_REF_QC"  # Quality flag for NEE_VUT_REF
-    nee_randunc = (
-        "NEE_" + XUT + "_REF_RANDUNC"
-    )  # Random uncertainty for NEE_VUT_REF, from measured only data
-    nee_jointunc = (
-        "NEE_" + XUT + "_REF_JOINTUNC"
-    )  # Joint uncertainty estimation for NEE_VUT_REF, including random uncertainty and USTAR filtering uncertainty
     night = "NIGHT"  # flag for nighttime
 
     # nee_mean = (
@@ -272,8 +268,6 @@ def main():
         nee,
         sw_in,
         nee_qc,
-        nee_randunc,
-        nee_jointunc,
         # nee_mean,  # TODO uncomment for using NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
@@ -356,15 +350,6 @@ def main():
         df_site, df_modis_intp, left_index=True, right_index=True, how="inner"
     )
     df_site_and_modis.reset_index(inplace=True)
-
-    nan_values = df_site_and_modis.isna()
-    nan_sum = nan_values.sum()
-    df_site_and_modis = df_site_and_modis.dropna()
-    df_site_and_modis.reset_index(drop=True, inplace=True)
-
-    if nan_sum.any():
-        print("WARNING: There are NaN values dropped from df_site_and_modis DataFrame")
-        print(nan_sum)
 
     ############################# prepare input variables  #############################
     # just use fluxnet qualities 0 and 1 - new in V3
@@ -585,6 +570,21 @@ def main():
             df_site_and_modis[timestamp].dt.year == year
         ].reset_index(drop=True)
 
+        nan_values = df_year.isna()
+        nan_sum = nan_values.sum()
+        df_year = df_year.dropna()
+        df_year.reset_index(drop=True, inplace=True)
+
+        if nan_sum.any():
+            print(
+                f"WARNING: There are {nan_sum} NaN values dropped from df_site_and_modis DataFrame"
+            )
+            if (nan_sum > 3500).any():
+                print(
+                    f"WARNING: The year {year} is skipped, as more than 5% of data is missing"
+                )
+                continue
+
         # Extract relevant columns
         T2M = df_year[t_air].reset_index(drop=True)
         LSWI = df_year["LSWI"].reset_index(drop=True)
@@ -601,13 +601,13 @@ def main():
                 (0.01, 6),  # Bounds for beta
             ]
             bounds_GPP = [
-                (-5, 50),  # Bounds for Topt
+                (0, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
-                (-5, 50),  # Bounds for Topt
+                (0, 50),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
@@ -829,10 +829,6 @@ def main():
                     "RMSE_NEE": [rmse_NEE],
                     "AIC": [AIC],
                     "NSE_NEE": [NSE_NEE],
-                    "RANDUNC": [df_year[nee_randunc].mean()],
-                    "JOINTUNC": [df_year[nee_jointunc].mean()],
-                    "RANDUNC_max": [df_year[nee_randunc].max()],
-                    "JOINTUNC_max": [df_year[nee_jointunc].max()],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],
@@ -870,10 +866,6 @@ def main():
                     "RMSE_NEE": [rmse_NEE],
                     "AIC": [AIC],
                     "NSE_NEE": [NSE_NEE],
-                    "RANDUNC": [df_year[nee_randunc].mean()],
-                    "JOINTUNC": [df_year[nee_jointunc].mean()],
-                    "RANDUNC_max": [df_year[nee_randunc].max()],
-                    "JOINTUNC_max": [df_year[nee_jointunc].max()],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],
