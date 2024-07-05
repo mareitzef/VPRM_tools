@@ -79,8 +79,9 @@ def main():
     V4 - final version
     V5 - using CUT instead of VUT method
     V6 - testing NEE_VUT_MEAN for Reco calibration
-    V7 - with RECO and GPP FLUXNET tuning and impvoed plots and testing lower boundary of T_opt till -5
-    V8 - drop years with not enough data and removed uncertainty again and still uning RECO and GPP FLUXNET tuning
+    V7 - with RECO and GPP FLUXNET tuning and impvoed plots and testing lower boundary of T_opt till -5 and initial T_opt = T_mean - 5
+    V8 - drop years with not enough data and removed uncertainty and -5 border again and still using RECO and GPP FLUXNET tuning
+    V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -101,13 +102,17 @@ def main():
         opt_method = args.opt_method
         VPRM_old_or_new = args.VPRM_old_or_new
         folder = args.folder
+        single_year = False  # only for local testing
+        year_to_plot = 2000  # only for local testing
     else:  # to run locally for single cases
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V8"  # version of deff evo
+        opt_method = "diff_evo_V9"  # version of diff evo
         VPRM_old_or_new = "old"  # "old","new"
-        folder = "FLX_IT-Col_FLUXNET2015_FULLSET_1996-2014_1-4"
+        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        single_year = True  # True for local testing, default=False
+        year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -126,7 +131,7 @@ def main():
             T2M,
         )
 
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[reco_from_nee]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_old_GPP(x):
@@ -181,7 +186,7 @@ def main():
             LSWI_max,
             EVI,
         )
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[nee_mean]) * df_year[night]
+        residuals_Reco = (np.array(Reco_VPRM) - df_year[reco_from_nee]) * df_year[night]
         return np.sum(residuals_Reco**2)
 
     def objective_function_VPRM_new_GPP(x):
@@ -252,12 +257,10 @@ def main():
     nee_qc = "NEE_" + XUT + "_REF_QC"  # Quality flag for NEE_VUT_REF
     night = "NIGHT"  # flag for nighttime
 
-    # nee_mean = (
-    #     "NEE_" + XUT + "_REF_pos"
-    # )  # only positive values from NEE_VUT_REF # TODO: uncomment for using NEE_VUT_REF
-    # test for "RECO_DT_" + XUT + "_REF"
-    nee_mean = r_eco
-    # nee_mean = "NEE_" + XUT + "_MEAN"  # TODO: test if NEE_VUT_MEAN hat better R2
+    reco_from_nee = "NEE_" + XUT + "_REF_pos"  # only positive values from NEE_VUT_REF
+    # test for "RECO_DT_" + XUT + "_REF" # V5 tested XUT vs VUT
+    # reco_from_nee = r_eco
+    # reco_from_nee = "NEE_" + XUT + "_MEAN"  # V6: tested if NEE_VUT_MEAN hat better R2
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
         timestamp,
@@ -268,11 +271,14 @@ def main():
         nee,
         sw_in,
         nee_qc,
-        # nee_mean,  # TODO uncomment for using NEE_VUT_MEAN
+        # reco_from_nee,  # TODO uncomment for using NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
     df_site[timestamp] = pd.to_datetime(df_site[timestamp], format="%Y%m%d%H%M")
+    # uncomment to plot single years
+    if single_year:
+        df_site = df_site[df_site[timestamp].dt.year == year_to_plot]
     df_site.set_index(timestamp, inplace=True)
     modis_path = base_path + folder + "/"
 
@@ -356,9 +362,9 @@ def main():
     df_site_and_modis.loc[df_site_and_modis[nee_qc] > 1, nee] = np.nan
     # create extra column for daytime NEE
     # TODO uncomment next 3 lines, if using NEE_VUT_REF - make automatic if needed later..
-    # df_site_and_modis[nee_mean] = df_site_and_modis[nee].copy()
-    # # only the respiration of nee_mean is used
-    # df_site_and_modis.loc[df_site_and_modis[nee_mean] < 0, nee_mean] = np.nan
+    df_site_and_modis[reco_from_nee] = df_site_and_modis[nee].copy()
+    # only the respiration of reco_from_nee is used
+    df_site_and_modis.loc[df_site_and_modis[reco_from_nee] < 0, reco_from_nee] = 0
 
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
@@ -383,7 +389,7 @@ def main():
 
     variables = [
         nee,
-        nee_mean,
+        reco_from_nee,
         gpp,
         r_eco,
         t_air,
@@ -488,7 +494,9 @@ def main():
     ].iloc[0]
     Topt = (
         df_site_and_modis[t_air].mean() - 5
-    )  # estimate  T_mean here to set furst Guess o T_opt
+    )  # estimate  T_mean here to set first Guess o T_opt
+    if Topt < 1:
+        Topt = 1
     if VPRM_old_or_new == "old":
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
@@ -577,11 +585,12 @@ def main():
 
         if nan_sum.any():
             print(
-                f"WARNING: There are {nan_sum} NaN values dropped from df_site_and_modis DataFrame"
+                f"WARNING: There are {(nan_sum).sum()} NaN values dropped from df_site_and_modis DataFrame"
             )
             if (nan_sum > 3500).any():
+                percent_nan = (nan_sum).any() / len(df_year) * 100
                 print(
-                    f"WARNING: The year {year} is skipped, as more than 5% of data is missing"
+                    f"WARNING: The year {year} is skipped, as more than 3500 values missing"
                 )
                 continue
 
@@ -757,7 +766,7 @@ def main():
             timestamp,
             df_year,
             nee,
-            nee_mean,
+            reco_from_nee,
             df_year["GPP_VPRM_first_guess"],
             GPP_VPRM_optimized,
             df_year["Reco_VPRM_first_guess"],
@@ -829,6 +838,7 @@ def main():
                     "RMSE_NEE": [rmse_NEE],
                     "AIC": [AIC],
                     "NSE_NEE": [NSE_NEE],
+                    "Dropped_NaNs": [(nan_sum).any()],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],

@@ -164,9 +164,9 @@ def plot_site_input(
 ):
 
     df_site_and_modis.set_index(timestamp, inplace=True)
-    font_size = 14
+    font_size = 12
 
-    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(10, 20))
+    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(8.27, 11.69))
     for i, var in enumerate(variables):
         row_index = i // 2  # Calculate the row index
         col_index = i % 2  # Calculate the column index
@@ -181,10 +181,10 @@ def plot_site_input(
         )
         axes[row_index, col_index].set_xlabel("Date", fontsize=font_size + 2)
         axes[row_index, col_index].set_ylabel(var, fontsize=font_size + 2)
-        axes[row_index, col_index].legend(fontsize=font_size)
+        # axes[row_index, col_index].legend(fontsize=font_size)
         axes[row_index, col_index].grid(True)
         axes[row_index, col_index].tick_params(
-            axis="both", which="major", labelsize=font_size
+            axis="both", which="major", labelsize=font_size, rotation=45
         )
 
     axes[0, 0].set_title(site_name + " - input data", fontsize=font_size + 2)
