@@ -80,6 +80,7 @@ def main():
     V5 - using CUT instead of VUT method
     V6 - testing NEE_VUT_MEAN for Reco calibration
     V7 - with RECO and GPP FLUXNET tuning and impvoed plots and testing lower boundary of T_opt till -5 and initial T_opt = T_mean - 5
+        -> there was a bug in GPP_calc for VPRM new, I used RECO correctly but not GPP
     V8 - drop years with not enough data and removed uncertainty and -5 border again and still using RECO and GPP FLUXNET tuning
     V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
     """
@@ -109,7 +110,7 @@ def main():
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V9"  # version of diff evo
-        VPRM_old_or_new = "old"  # "old","new"
+        VPRM_old_or_new = "new"  # "old","new"
         folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
         single_year = True  # True for local testing, default=False
         year_to_plot = 2012
@@ -403,7 +404,6 @@ def main():
     Tmax = 45
 
     #############################  first guess  of parameters #########################
-    # Topt = 20.0  # T_opt is now defined below as  T_mean - 5
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
         VPRM_table_first_guess = {
@@ -497,6 +497,7 @@ def main():
     )  # estimate  T_mean here to set first Guess o T_opt
     if Topt < 1:
         Topt = 1
+    # Topt = 20.0  # T_opt was constant before, is now defined below as  T_mean - 5, improved R2_NEE by 1%
     if VPRM_old_or_new == "old":
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
@@ -651,10 +652,10 @@ def main():
                 beta,
                 T2M,
             )
-            # TODO make swith here if GPP_calc is needed
-            # df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
-            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            df_year["GPP_calc"] = df_year[gpp]
+
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_old_GPP,
@@ -705,6 +706,7 @@ def main():
             )
             df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
             df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_new_GPP,
