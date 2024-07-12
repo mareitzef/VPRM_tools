@@ -56,7 +56,7 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[0].set_xlabel("Date", fontsize=font_size + 2)
     axes[0].set_ylabel("Reco", fontsize=font_size + 2)
-    axes[0].set_title("Measured and Modeled Reco", fontsize=font_size + 2)
+    axes[0].set_title(site_name + " - Measured and Modeled GPP", fontsize=font_size + 2)
     axes[0].legend(fontsize=font_size)
     axes[0].grid(True)
     axes[0].tick_params(axis="both", which="major", labelsize=font_size)
@@ -96,7 +96,6 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[1].set_xlabel("Date", fontsize=font_size + 2)
     axes[1].set_ylabel("GPP", fontsize=font_size + 2)
-    axes[1].set_title(site_name + " - Measured and Modeled GPP", fontsize=font_size + 2)
     axes[1].legend(fontsize=font_size)
     axes[1].grid(True)
     axes[1].tick_params(axis="both", which="major", labelsize=font_size)
@@ -108,7 +107,7 @@ def plot_measured_vs_optimized_VPRM(
         linestyle="",
         marker="o",
         markersize=1,
-        label="Modeled NEE",
+        label="Modeled NEE first guess",
         color="green",
     )
     axes[2].plot(
@@ -131,7 +130,6 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[2].set_xlabel("Date", fontsize=font_size + 2)
     axes[2].set_ylabel("NEE", fontsize=font_size + 2)
-    axes[2].set_title("Measured and Modeled NEE", fontsize=font_size + 2)
     axes[2].legend(fontsize=font_size)
     axes[2].grid(True)
     axes[2].tick_params(axis="both", which="major", labelsize=font_size)

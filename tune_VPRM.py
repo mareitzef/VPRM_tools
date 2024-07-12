@@ -80,7 +80,7 @@ def main():
     V5 - using CUT instead of VUT method
     V6 - testing NEE_VUT_MEAN for Reco calibration
     V7 - with RECO and GPP FLUXNET tuning and impvoed plots and testing lower boundary of T_opt till -5 and initial T_opt = T_mean - 5
-        -> there was a bug in GPP_calc for VPRM new, I used RECO correctly but not GPP
+        -> there was a bug in GPP_calc for VPRM new, I used RECO correctly but not GPP, for VPRM_old it was correct
     V8 - drop years with not enough data and removed uncertainty and -5 border again and still using RECO and GPP FLUXNET tuning
     V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
     """
@@ -497,7 +497,7 @@ def main():
     )  # estimate  T_mean here to set first Guess o T_opt
     if Topt < 1:
         Topt = 1
-    # Topt = 20.0  # T_opt was constant before, is now defined below as  T_mean - 5, improved R2_NEE by 1%
+    # Topt = 20.0  # T_opt was constant before V8, is now defined below as  T_mean - 5 or min 1, improved R2_NEE by 1%
     if VPRM_old_or_new == "old":
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
@@ -564,6 +564,10 @@ def main():
         )
 
     df_site_and_modis["GPP_VPRM_first_guess"] = GPP_VPRM
+    if folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4":
+        df_site_and_modis.loc[
+            df_site_and_modis["GPP_VPRM_first_guess"] > 30, "GPP_VPRM_first_guess"
+        ] = np.nan
     df_site_and_modis["Reco_VPRM_first_guess"] = Reco_VPRM
 
     ###################### optimization for each site year  ####################
@@ -781,7 +785,7 @@ def main():
             maxiter,
         )
         ########################## Calculate error measures ##########################
-
+        # TODO: correlate df_year[gpp] with GPP_VPRM_optimized if using gpp for optimization.
         mask = (
             ~np.isnan(df_year[nee])
             & ~np.isnan(Reco_VPRM_optimized)
@@ -792,15 +796,19 @@ def main():
             np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
         )
 
-        R2_GPP = r2_score(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
-        R2_Reco = r2_score(df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask])
+        R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_VPRM_optimized)[mask])
+        R2_Reco = r2_score(
+            df_year[reco_from_nee][mask], np.array(Reco_VPRM_optimized)[mask]
+        )
 
         rmse_GPP = np.sqrt(
-            mean_squared_error(df_year[gpp][mask], np.array(GPP_VPRM_optimized)[mask])
+            mean_squared_error(
+                df_year["GPP_calc"][mask], np.array(GPP_VPRM_optimized)[mask]
+            )
         )
         rmse_Reco = np.sqrt(
             mean_squared_error(
-                df_year[r_eco][mask], np.array(Reco_VPRM_optimized)[mask]
+                df_year[reco_from_nee][mask], np.array(Reco_VPRM_optimized)[mask]
             )
         )
         rmse_NEE = np.sqrt(
