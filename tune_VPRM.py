@@ -83,6 +83,7 @@ def main():
         -> there was a bug in GPP_calc for VPRM new, I used RECO correctly but not GPP, for VPRM_old it was correct
     V8 - drop years with not enough data and removed uncertainty and -5 border again and still using RECO and GPP FLUXNET tuning
     V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
+    V10 - defining min boundary of Topt from analysis of FLUXNET data
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -109,11 +110,11 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V9"  # version of diff evo
-        VPRM_old_or_new = "new"  # "old","new"
-        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        opt_method = "diff_evo_V10"  # version of diff evo
+        VPRM_old_or_new = "old"  # "old","new"
+        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
         single_year = True  # True for local testing, default=False
-        year_to_plot = 2012
+        year_to_plot = 2008
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -214,6 +215,58 @@ def main():
 
         residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
         return np.sum(residuals_GPP**2)
+
+    def get_Topt_per_site(df_site):
+        # Clean the data
+        df_site["TA_F"] = df_site["TA_F"].replace(-9999.0, np.nan)
+        df_site = df_site.dropna(subset=["TA_F"])
+        df_site["GPP_DT_VUT_REF"] = df_site["GPP_DT_VUT_REF"].replace(-9999.0, np.nan)
+        df_site = df_site.dropna(subset=["GPP_DT_VUT_REF"])
+
+        # Set the values to np.nan during nighttime
+
+        df_daily = (
+            df_site.resample("D")
+            .agg({"TA_F": "mean", "GPP_DT_VUT_REF": "mean"})
+            .dropna()
+        )
+        df_daily["YEAR"] = df_daily.index.year
+        years = df_daily["YEAR"].unique()
+
+        real_Topt = []
+        min_Topt = []
+        for year in years:
+            df_year_Topt = df_daily[df_daily["YEAR"] == year].copy()
+            # Group by each degree of temperature and calculate the mean values
+            df_year_Topt.loc[:, "TA_F_rounded"] = df_year_Topt["TA_F"].round(1)
+            mean_values = df_year_Topt.groupby("TA_F_rounded").mean()
+            coeffs = np.polyfit(mean_values.index, mean_values["GPP_DT_VUT_REF"], 2)
+            poly_fit = np.polyval(coeffs, mean_values.index)
+            max_index = mean_values.index[np.argmax(poly_fit)]
+            if max_index < 0:
+                max_index = np.nan
+            max_value = poly_fit[np.argmax(poly_fit)]
+
+            if max_index < df_year_Topt["TA_F_rounded"].max():
+                print(
+                    f"Topt={max_index} is real with {max_value.round(2)} for {year} at Site {site_name}"
+                )
+                real_Topt.append(max_index)
+            else:
+                print(
+                    f"Topt={max_index} is a minimum with {max_value.round(1)} for {year} at Site {site_name}"
+                )
+                min_Topt.append(max_index)
+        if len(real_Topt) > len(min_Topt):
+            real_Topt_flag = True
+            Topt_min = np.mean(real_Topt)
+            Topt_max = np.mean(real_Topt)
+        else:
+            real_Topt_flag = False
+            Topt_min = np.mean(min_Topt)
+            Topt_max = 50
+
+        return Topt_min, Topt_max, real_Topt_flag
 
     ###########################################################################################
 
@@ -403,6 +456,8 @@ def main():
     Tmin = 0
     Tmax = 45
 
+    Topt_min, Topt_max, real_Topt_flag = get_Topt_per_site(df_site)
+
     #############################  first guess  of parameters #########################
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
     if VPRM_old_or_new == "old":
@@ -421,6 +476,15 @@ def main():
             ],
             "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
             "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
+            "T_opt": [
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+            ],
         }
     ###################### table from Gourdji 2022 for VPRM_new ############################
     elif VPRM_old_or_new == "new":
@@ -483,6 +547,16 @@ def main():
                 0.0090,
                 0.0156,
             ],
+            "T_opt": [
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+                Topt_min,
+            ],  # TODO: define for Europe
         }
     else:
         print("ERROR - you have to choose VPRM_old_or_new")
@@ -492,18 +566,14 @@ def main():
     parameters = df_VPRM_table_first_guess[
         df_VPRM_table_first_guess["PFT"] == target_pft
     ].iloc[0]
-    Topt = (
-        df_site_and_modis[t_air].mean() - 5
-    )  # estimate  T_mean here to set first Guess o T_opt
-    if Topt < 1:
-        Topt = 1
-    # Topt = 20.0  # T_opt was constant before V8, is now defined below as  T_mean - 5 or min 1, improved R2_NEE by 1%
+    # Topt = 20.0  # T_opt was constant before V8
     if VPRM_old_or_new == "old":
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
         beta = parameters["beta"]
         lambd = -parameters["lambda"]
         VPRM_veg_ID = parameters["VPRM_veg_ID"]
+        Topt = parameters["T_opt"]
     if VPRM_old_or_new == "new":
         PAR0 = parameters["PAR0"]
         beta = parameters["beta"]
@@ -517,6 +587,7 @@ def main():
         theta1 = parameters["theta1"]
         theta2 = parameters["theta2"]
         theta3 = parameters["theta3"]
+        Topt = parameters["T_opt"]
 
     ###################### run VPRM with first Guess for comparison plot #################
     if VPRM_old_or_new == "old":
@@ -604,9 +675,9 @@ def main():
         LSWI = df_year["LSWI"].reset_index(drop=True)
         EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
         PAR = df_year["PAR"].reset_index(drop=True)
-        Topt = (
-            df_year[t_air].mean() - 5
-        )  # estimate  T_mean here to set furst Guess o T_opt
+        # Topt = (
+        #     df_year[t_air].mean() - 5
+        # )  # estimate  T_mean here to set furst Guess o T_opt
 
         ####################### Set bounds which are valid for all PFTs ################
         if VPRM_old_or_new == "old":
@@ -615,13 +686,13 @@ def main():
                 (0.01, 6),  # Bounds for beta
             ]
             bounds_GPP = [
-                (0, 50),  # Bounds for Topt
+                (Topt_min, Topt_max),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
         elif VPRM_old_or_new == "new":
             bounds_GPP = [
-                (0, 50),  # Bounds for Topt
+                (Topt_min, Topt_max),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
