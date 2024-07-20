@@ -112,8 +112,8 @@ def main():
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V10"  # version of diff evo
         VPRM_old_or_new = "old"  # "old","new"
-        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
-        single_year = True  # True for local testing, default=False
+        folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
+        single_year = False  # True for local testing, default=False
         year_to_plot = 2008
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -249,12 +249,12 @@ def main():
 
             if max_index < df_year_Topt["TA_F_rounded"].max():
                 print(
-                    f"Topt={max_index} is real with {max_value.round(2)} for {year} at Site {site_name}"
+                    f"Topt={max_index} is real with GPP={max_value.round(2)} for {year} at Site {site_name}"
                 )
                 real_Topt.append(max_index)
             else:
                 print(
-                    f"Topt={max_index} is a minimum with {max_value.round(1)} for {year} at Site {site_name}"
+                    f"Topt={max_index} is a minimum with GPP={max_value.round(1)} for {year} at Site {site_name}"
                 )
                 min_Topt.append(max_index)
         if len(real_Topt) > len(min_Topt):
@@ -265,7 +265,7 @@ def main():
             real_Topt_flag = False
             Topt_min = np.mean(min_Topt)
             Topt_max = 50
-
+        print(f"Topt_min={Topt_min.round(1)} - Topt_max={Topt_max} at Site {site_name}")
         return Topt_min, Topt_max, real_Topt_flag
 
     ###########################################################################################
