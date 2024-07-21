@@ -62,6 +62,17 @@ def calculate_AIC(n, mse, k):
     return AIC
 
 
+def migliavacca_LinGPP(
+    T_ref, T0, E0, k_mm, k2, alpha_p, alpha_lai, max_lai, R_lai0, GPP, P, T_A
+):
+    R_ref = R_lai0 + alpha_lai * max_lai + k2 * GPP
+    f_T = np.exp(E0 * (1 / (T_ref - T0) - 1 / (T_A - T0)))
+    f_P = (alpha_lai * k_mm + P * (1 - alpha_p)) / (k_mm + P * (1 - alpha_p))
+
+    reco_LinGPP = R_ref * f_T * f_P
+    return reco_LinGPP
+
+
 def main():
     """
     This function serves as the main entry point for running the VPRM optimization process.
@@ -84,6 +95,7 @@ def main():
     V8 - drop years with not enough data and removed uncertainty and -5 border again and still using RECO and GPP FLUXNET tuning
     V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
     V10 - defining min boundary of Topt from analysis of FLUXNET data
+    V11 - optimize migliacacca R_eco
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -95,14 +107,17 @@ def main():
             "-m", "--opt_method", type=str, help="Optimization method argument"
         )
         parser.add_argument(
-            "-v", "--VPRM_old_or_new", type=str, help="VPRM old or new argument"
+            "-v",
+            "--CO2_parametrization",
+            type=str,
+            help="chose a model for CO2 parametrization",
         )
         args = parser.parse_args()
 
         base_path = args.base_path
         maxiter = args.maxiter
         opt_method = args.opt_method
-        VPRM_old_or_new = args.VPRM_old_or_new
+        CO2_parametrization = args.CO2_parametrization
         folder = args.folder
         single_year = False  # only for local testing
         year_to_plot = 2000  # only for local testing
@@ -110,11 +125,11 @@ def main():
 
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V10"  # version of diff evo
-        VPRM_old_or_new = "old"  # "old","new"
-        folder = "FLX_IT-PT1_FLUXNET2015_FULLSET_2002-2004_1-4"
-        single_year = False  # True for local testing, default=False
-        year_to_plot = 2008
+        opt_method = "diff_evo_V11"  # version of diff evo
+        CO2_parametrization = "migli"  # "old","new", "migli"
+        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        single_year = True  # True for local testing, default=False
+        year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -215,6 +230,30 @@ def main():
 
         residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
         return np.sum(residuals_GPP**2)
+
+    def objective_function_migliavacca_LinGPP(params):
+        (R_lai0, alpha_lai, k2, E0, alpha_p, k_mm) = params
+
+        reco_LinGPP = migliavacca_LinGPP(
+            T_ref,
+            T0,
+            E0,
+            k_mm,
+            k2,
+            alpha_p,
+            alpha_lai,
+            max_lai,
+            R_lai0,
+            df_site_and_modis[gpp],
+            df_site_and_modis["P"],
+            T2M + 273.5,
+        )
+        residuals = reco_LinGPP - df_year[r_eco]
+
+        valid_indices = ~np.isnan(residuals)
+        abs_error = residuals[valid_indices]
+
+        return np.sum(abs_error**2)
 
     def get_Topt_per_site(df_site):
         # Clean the data
@@ -325,6 +364,7 @@ def main():
         nee,
         sw_in,
         nee_qc,
+        "P",
         # reco_from_nee,  # TODO uncomment for using NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
@@ -364,7 +404,7 @@ def main():
     for file_list in [mod_files, myd_files]:
         for file_path in file_list:
             df = pd.read_excel(file_path)[["calendar_date", "value"]].assign(
-                value=lambda x: x["value"] * 0.0001
+                value=lambda x: x["value"] * 0.0001  # TODO: scale Lai diffently
             )  # sclaing factor from user guide: https://lpdaac.usgs.gov/documents/103/MOD13_User_Guide_V6.pdf
             file_parts = file_path.split("/")[-1]
             file_parts2 = file_parts.split("_")[2:6]
@@ -428,6 +468,7 @@ def main():
     EVI = df_site_and_modis["250m_16_days_EVI"]
     PAR = df_site_and_modis["PAR"]
     LSWI = df_site_and_modis["LSWI"]
+
     # LSWImax is the site-specific multiyear maximum daily LSWI from May to October
     df_may_to_october = df_site_and_modis[
         (df_site_and_modis[timestamp].dt.month >= 5)
@@ -460,7 +501,7 @@ def main():
 
     #############################  first guess  of parameters #########################
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
-    if VPRM_old_or_new == "old":
+    if CO2_parametrization == "old" or CO2_parametrization == "migli":
         VPRM_table_first_guess = {
             "PFT": ["ENF", "DBF", "MF", "SHB", "WET", "CRO", "GRA"],
             "VPRM_veg_ID": [1, 2, 3, 4, 5, 6, 7],
@@ -487,7 +528,7 @@ def main():
             ],
         }
     ###################### table from Gourdji 2022 for VPRM_new ############################
-    elif VPRM_old_or_new == "new":
+    elif CO2_parametrization == "new":
         VPRM_table_first_guess = {
             "PFT": ["DBF", "ENF", "MF", "SHB", "GRA", "WET", "CRO", "CRC"],
             "VPRM_veg_ID": [2, 1, 3, 4, 7, 5, 6, 8],
@@ -558,23 +599,134 @@ def main():
                 Topt_min,
             ],  # TODO: define for Europe
         }
+
+    if CO2_parametrization == "migli":
+        # Initial values and boundaries for all PFTs
+        boundaries = {
+            "ENF": {
+                "RLAI": (1.02, 0.42),
+                "alphaLAI": (0.42, 0.08),
+                "k2": (0.478, 0.013),
+                "E0(K)": (124.833, 4.656),
+                "alpha": (0.604, 0.065),
+                "K (mm)": (0.222, 0.070),
+            },
+            "DBF": {
+                "RLAI": (1.27, 0.50),
+                "alphaLAI": (0.34, 0.10),
+                "k2": (0.247, 0.009),
+                "E0(K)": (87.655, 4.405),
+                "alpha": (0.796, 0.031),
+                "K (mm)": (0.184, 0.064),
+            },
+            "GRA": {
+                "RLAI": (0.41, 0.71),
+                "alphaLAI": (1.14, 0.33),
+                "k2": (0.578, 0.062),
+                "E0(K)": (101.181, 6.362),
+                "alpha": (0.670, 0.052),
+                "K (mm)": (0.765, 1.589),
+            },
+            "CRO": {
+                "RLAI": (0.25, 0.66),
+                "alphaLAI": (0.40, 0.11),
+                "k2": (0.244, 0.016),
+                "E0(K)": (129.498, 5.618),
+                "alpha": (0.934, 0.065),
+                "K (mm)": (0.035, 3.018),
+            },
+            "SAV": {
+                "RLAI": (0.42, 0.39),
+                "alphaLAI": (0.57, 0.17),
+                "k2": (0.654, 0.024),
+                "E0(K)": (81.537, 7.030),
+                "alpha": (0.474, 0.018),
+                "K (mm)": (0.567, 0.119),
+            },
+            "SHB": {
+                "RLAI": (0.42, 0.39),
+                "alphaLAI": (0.57, 0.17),
+                "k2": (0.354, 0.021),
+                "E0(K)": (156.746, 8.222),
+                "alpha": (0.850, 0.070),
+                "K (mm)": (0.097, 1.304),
+            },
+            "EBF": {
+                "RLAI": (-0.47, 0.50),
+                "alphaLAI": (0.82, 0.13),
+                "k2": (0.602, 0.044),
+                "E0(K)": (52.753, 4.351),
+                "alpha": (0.593, 0.032),
+                "K (mm)": (2.019, 1.052),
+            },
+            "MF": {
+                "RLAI": (0.78, 0.18),
+                "alphaLAI": (0.44, 0.04),
+                "k2": (0.391, 0.068),
+                "E0(K)": (176.542, 8.222),
+                "alpha": (0.703, 0.083),
+                "K (mm)": (2.831, 4.847),
+            },
+            "WET": {
+                "RLAI": (0.78, 0.18),
+                "alphaLAI": (0.44, 0.04),
+                "k2": (0.398, 0.013),
+                "E0(K)": (144.705, 8.762),
+                "alpha": (0.582, 0.163),
+                "K (mm)": (0.054, 0.593),
+            },
+        }
+
+        def get_bounds_for_migliavacca(pft):
+            return [
+                (
+                    boundaries[pft]["RLAI"][0] - 2 * boundaries[pft]["RLAI"][1],
+                    boundaries[pft]["RLAI"][0] + 2 * boundaries[pft]["RLAI"][1],
+                ),
+                (
+                    boundaries[pft]["alphaLAI"][0] - 2 * boundaries[pft]["alphaLAI"][1],
+                    boundaries[pft]["alphaLAI"][0] + 2 * boundaries[pft]["alphaLAI"][1],
+                ),
+                (
+                    boundaries[pft]["k2"][0] - 2 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] + 2 * boundaries[pft]["k2"][1],
+                ),
+                (
+                    boundaries[pft]["E0(K)"][0] - 2 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] + 2 * boundaries[pft]["E0(K)"][1],
+                ),
+                (
+                    boundaries[pft]["alpha"][0] - 2 * boundaries[pft]["alpha"][1],
+                    boundaries[pft]["alpha"][0] + 2 * boundaries[pft]["alpha"][1],
+                ),
+                (
+                    boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] + 2 * boundaries[pft]["K (mm)"][1],
+                ),
+            ]
+
     else:
-        print("ERROR - you have to choose VPRM_old_or_new")
+        print("ERROR - you have to choose a model")
 
     ###################### select first guess according to PFT ##########################
-    df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
-    parameters = df_VPRM_table_first_guess[
-        df_VPRM_table_first_guess["PFT"] == target_pft
-    ].iloc[0]
+
     # Topt = 20.0  # T_opt was constant before V8
-    if VPRM_old_or_new == "old":
+    if CO2_parametrization == "old" or CO2_parametrization == "migli":
+        df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
+        parameters = df_VPRM_table_first_guess[
+            df_VPRM_table_first_guess["PFT"] == target_pft
+        ].iloc[0]
         PAR0 = parameters["PAR0"]
         alpha = parameters["alpha"]
         beta = parameters["beta"]
         lambd = -parameters["lambda"]
         VPRM_veg_ID = parameters["VPRM_veg_ID"]
         Topt = parameters["T_opt"]
-    if VPRM_old_or_new == "new":
+    elif CO2_parametrization == "new":
+        df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
+        parameters = df_VPRM_table_first_guess[
+            df_VPRM_table_first_guess["PFT"] == target_pft
+        ].iloc[0]
         PAR0 = parameters["PAR0"]
         beta = parameters["beta"]
         lambd = -parameters["lambda"]
@@ -590,7 +742,7 @@ def main():
         Topt = parameters["T_opt"]
 
     ###################### run VPRM with first Guess for comparison plot #################
-    if VPRM_old_or_new == "old":
+    if CO2_parametrization == "old":
         GPP_VPRM, Reco_VPRM = VPRM_old(
             Topt,
             PAR0,
@@ -608,7 +760,15 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
-    elif VPRM_old_or_new == "new":
+        df_site_and_modis["GPP_first_guess"] = GPP_VPRM
+        if (
+            folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        ):  # cut values for plotting
+            df_site_and_modis.loc[
+                df_site_and_modis["GPP_first_guess"] > 30, "GPP_first_guess"
+            ] = np.nan
+        df_site_and_modis["Reco_first_guess"] = Reco_VPRM
+    elif CO2_parametrization == "new":
         GPP_VPRM, Reco_VPRM = VPRM_new(
             Topt,
             PAR0,
@@ -633,13 +793,39 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
-
-    df_site_and_modis["GPP_VPRM_first_guess"] = GPP_VPRM
-    if folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4":
-        df_site_and_modis.loc[
-            df_site_and_modis["GPP_VPRM_first_guess"] > 30, "GPP_VPRM_first_guess"
-        ] = np.nan
-    df_site_and_modis["Reco_VPRM_first_guess"] = Reco_VPRM
+        df_site_and_modis["GPP_first_guess"] = GPP_VPRM
+        if (
+            folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        ):  # cut values for plotting
+            df_site_and_modis.loc[
+                df_site_and_modis["GPP_first_guess"] > 30, "GPP_first_guess"
+            ] = np.nan
+        df_site_and_modis["Reco_first_guess"] = Reco_VPRM
+    elif CO2_parametrization == "migli":
+        T_ref = 288.15
+        T0 = 227.13
+        lai_column = [
+            col for col in df_site_and_modis.columns if col.startswith("Lai_")
+        ]
+        max_lai = (
+            df_site_and_modis[lai_column].max() * 1000
+        )  # TODO: use correct scale directly
+        max_lai = float(max_lai)
+        df_site_and_modis["GPP_first_guess"] = df_site_and_modis[gpp]
+        df_site_and_modis["Reco_first_guess"] = migliavacca_LinGPP(
+            T_ref,
+            T0,
+            boundaries[target_pft]["E0(K)"][0],
+            boundaries[target_pft]["K (mm)"][0],
+            boundaries[target_pft]["k2"][0],
+            boundaries[target_pft]["alpha"][0],
+            boundaries[target_pft]["alphaLAI"][0],
+            max_lai,
+            boundaries[target_pft]["RLAI"][0],
+            df_site_and_modis[gpp],
+            df_site_and_modis["P"],
+            T2M + 273.5,
+        )
 
     ###################### optimization for each site year  ####################
     optimized_params_df = pd.DataFrame()
@@ -680,7 +866,7 @@ def main():
         # )  # estimate  T_mean here to set furst Guess o T_opt
 
         ####################### Set bounds which are valid for all PFTs ################
-        if VPRM_old_or_new == "old":
+        if CO2_parametrization == "old":
             bounds_Reco = [
                 (0.01, 5),  # Bounds for alpha
                 (0.01, 6),  # Bounds for beta
@@ -690,7 +876,7 @@ def main():
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
-        elif VPRM_old_or_new == "new":
+        elif CO2_parametrization == "new":
             bounds_GPP = [
                 (Topt_min, Topt_max),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
@@ -709,7 +895,7 @@ def main():
             ]
 
         ################### optimize with 'differential_evolution' ###############
-        if VPRM_old_or_new == "old":
+        if CO2_parametrization == "old":
             result = differential_evolution(
                 objective_function_VPRM_old_Reco,
                 bounds_Reco,
@@ -722,13 +908,13 @@ def main():
                 beta,
             ] = result.x
 
-            Reco_VPRM_optimized_0 = VPRM_old_only_Reco(
+            Reco_optimized_0 = VPRM_old_only_Reco(
                 alpha,
                 beta,
                 T2M,
             )
 
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
             df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
             # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
 
@@ -749,7 +935,7 @@ def main():
                 lambd,
             ]
 
-        elif VPRM_old_or_new == "new":
+        elif CO2_parametrization == "new":
 
             result = differential_evolution(
                 objective_function_VPRM_new_Reco,
@@ -771,7 +957,7 @@ def main():
                 theta3,
             ] = optimized_params_t
 
-            Reco_VPRM_optimized_0 = VPRM_new_only_Reco(
+            Reco_optimized_0 = VPRM_new_only_Reco(
                 *optimized_params_t,
                 T2M,
                 LSWI,
@@ -779,7 +965,7 @@ def main():
                 LSWI_max,
                 EVI,
             )
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_optimized_0)
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
             df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
             # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
 
@@ -804,10 +990,60 @@ def main():
                 theta2,
                 theta3,
             ]
+        ########################## optimize Reco with LinGPP ######################
+        elif CO2_parametrization == "migli":
+            bounds_migli = get_bounds_for_migliavacca(target_pft)
+            result = differential_evolution(
+                objective_function_migliavacca_LinGPP,
+                bounds=bounds_migli,
+                maxiter=maxiter,
+                disp=True,
+            )
+            R_lai0, alpha_lai, k2, E0, alpha_p, k_mm = result.x
+            # use Reco from migliavacce to tuning GPP of VPRM
+            Reco_optimized = migliavacca_LinGPP(
+                T_ref,
+                T0,
+                E0,
+                k_mm,
+                k2,
+                alpha_p,
+                alpha_lai,
+                max_lai,
+                R_lai0,
+                df_year[gpp],
+                df_year["P"],
+                T2M + 273.5,
+            )
+
+            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized.tolist())
+            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            bounds_GPP = [
+                (Topt_min, Topt_max),  # Bounds for Topt
+                (1, 6000),  # Bounds for PAR0
+                (0.01, 1),  # Bounds for lambd
+            ]
+
+            result = differential_evolution(
+                objective_function_VPRM_old_GPP,
+                bounds_GPP,
+                maxiter=maxiter,  # Number of generations
+                disp=True,
+            )
+            optimized_params = result.x
+
+            [Topt, PAR0, lambd] = result.x
+            optimized_params = [
+                Topt,
+                PAR0,
+                alpha,
+                beta,
+                lambd,
+            ]
 
         ############### Calculate model predictions with optimized parameters ###########
-        if VPRM_old_or_new == "old":
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_old(
+        if CO2_parametrization == "old":
+            GPP_optimized, Reco_optimized = VPRM_old(
                 *optimized_params,
                 Tmin,
                 Tmax,
@@ -821,8 +1057,8 @@ def main():
                 VEGFRA,
             )
 
-        elif VPRM_old_or_new == "new":
-            GPP_VPRM_optimized, Reco_VPRM_optimized = VPRM_new(
+        elif CO2_parametrization == "new":
+            GPP_optimized, Reco_optimized = VPRM_new(
                 *optimized_params,
                 Tmin,
                 Tmax,
@@ -835,7 +1071,36 @@ def main():
                 VPRM_veg_ID,
                 VEGFRA,
             )
-        ########################## TODO: optimize Reco with LinGPP ######################
+        elif CO2_parametrization == "migli":
+            GPP_optimized, Reco_optimized_VPRM = VPRM_old(
+                *optimized_params,
+                Tmin,
+                Tmax,
+                T2M,
+                LSWI,
+                LSWI_min,
+                LSWI_max,
+                EVI,
+                PAR,
+                VPRM_veg_ID,
+                VEGFRA,
+            )
+            Reco_optimized = migliavacca_LinGPP(
+                T_ref,
+                T0,
+                E0,
+                k_mm,
+                k2,
+                alpha_p,
+                alpha_lai,
+                max_lai,
+                R_lai0,
+                df_year[gpp],
+                df_year["P"],
+                T2M + 273.5,
+            )
+
+            Reco_optimized = Reco_optimized.tolist()
 
         ########################## plot the data ######################
         plot_measured_vs_optimized_VPRM(
@@ -844,59 +1109,54 @@ def main():
             df_year,
             nee,
             reco_from_nee,
-            df_year["GPP_VPRM_first_guess"],
-            GPP_VPRM_optimized,
-            df_year["Reco_VPRM_first_guess"],
-            Reco_VPRM_optimized,
+            df_year["GPP_first_guess"],
+            GPP_optimized,
+            df_year["Reco_first_guess"],
+            Reco_optimized,
             base_path,
             folder,
-            VPRM_old_or_new,
+            CO2_parametrization,
             year,
             opt_method,
             maxiter,
         )
         ########################## Calculate error measures ##########################
-        # TODO: correlate df_year[gpp] with GPP_VPRM_optimized if using gpp for optimization.
+        # TODO: correlate df_year[gpp] with GPP_optimized if using gpp for optimization.
         mask = (
             ~np.isnan(df_year[nee])
-            & ~np.isnan(Reco_VPRM_optimized)
-            & ~np.isnan(GPP_VPRM_optimized)
+            & ~np.isnan(Reco_optimized)
+            & ~np.isnan(GPP_optimized)
         )
         R2_NEE = r2_score(
             df_year[nee][mask],
-            np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
+            np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
         )
 
-        R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_VPRM_optimized)[mask])
-        R2_Reco = r2_score(
-            df_year[reco_from_nee][mask], np.array(Reco_VPRM_optimized)[mask]
-        )
+        R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
+        R2_Reco = r2_score(df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask])
 
         rmse_GPP = np.sqrt(
-            mean_squared_error(
-                df_year["GPP_calc"][mask], np.array(GPP_VPRM_optimized)[mask]
-            )
+            mean_squared_error(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
         )
         rmse_Reco = np.sqrt(
             mean_squared_error(
-                df_year[reco_from_nee][mask], np.array(Reco_VPRM_optimized)[mask]
+                df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
             )
         )
         rmse_NEE = np.sqrt(
             mean_squared_error(
                 df_year[nee][mask],
-                np.array(Reco_VPRM_optimized)[mask]
-                - np.array(GPP_VPRM_optimized)[mask],
+                np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
             )
         )
 
         NSE_NEE = calculate_NSE(
             df_year[nee][mask],
-            np.array(Reco_VPRM_optimized)[mask] - np.array(GPP_VPRM_optimized)[mask],
+            np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
         )
 
         ########################## Save results to Excel ##########################
-        if VPRM_old_or_new == "old":
+        if CO2_parametrization == "old":
             # Calculate AIC for the old model
             AIC = calculate_AIC(
                 17520, rmse_NEE**2, 5
@@ -927,7 +1187,7 @@ def main():
                     "elev": [elevation],
                 }
             )
-        elif VPRM_old_or_new == "new":
+        elif CO2_parametrization == "new":
             # Calculate AIC for the new model
             AIC = calculate_AIC(
                 17520, rmse_NEE**2, 12
@@ -964,6 +1224,38 @@ def main():
                     "elev": [elevation],
                 }
             )
+        elif CO2_parametrization == "migli":
+            # Calculate AIC for the new model
+            AIC = calculate_AIC(
+                17520, rmse_NEE**2, 12
+            )  # Assuming 5 parameters for the new model
+            data_to_append = pd.DataFrame(
+                {
+                    "site_ID": [site_name],
+                    "PFT": [target_pft],
+                    "Year": [year],
+                    "Topt": [Topt_min],
+                    "RLAI": [R_lai0],
+                    "alphaLAI": [alpha_lai],
+                    "k2": [k2],
+                    "E0(K)": [E0],
+                    "alpha": [alpha_p],
+                    "K (mm)": [k_mm],
+                    "R2_GPP": [R2_GPP],
+                    "R2_Reco": [R2_Reco],
+                    "R2_NEE": [R2_NEE],
+                    "RMSE_GPP": [rmse_GPP],
+                    "RMSE_Reco": [rmse_Reco],
+                    "RMSE_NEE": [rmse_NEE],
+                    "AIC": [AIC],
+                    "NSE_NEE": [NSE_NEE],
+                    "T_mean": [df_year[t_air].mean()],
+                    "T_max": [df_year[t_air].resample("D").max().mean()],
+                    "lat": [latitude],
+                    "lon": [longitude],
+                    "elev": [elevation],
+                }
+            )
 
         print(data_to_append)
         optimized_params_df = pd.concat(
@@ -981,7 +1273,7 @@ def main():
         + "_"
         + target_pft
         + "_optimized_params_"
-        + VPRM_old_or_new
+        + CO2_parametrization
         + "_"
         + opt_method
         + "_"
@@ -1001,7 +1293,7 @@ def main():
         site_name,
         folder,
         base_path,
-        VPRM_old_or_new,
+        CO2_parametrization,
         gpp,
         r_eco,
         nee,

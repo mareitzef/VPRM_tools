@@ -211,7 +211,7 @@ def plot_measured_vs_modeled(
     )
     axes[0].plot(
         df_site_and_modis.index,
-        df_site_and_modis["GPP_VPRM_first_guess"],
+        df_site_and_modis["GPP_first_guess"],
         label="Modeled GPP",
         color="green",
         linestyle="",
@@ -235,7 +235,7 @@ def plot_measured_vs_modeled(
     )
     axes[1].plot(
         df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM_first_guess"],
+        df_site_and_modis["Reco_first_guess"],
         label="Modeled Reco",
         color="green",
         linestyle="",
@@ -259,8 +259,7 @@ def plot_measured_vs_modeled(
     )
     axes[2].plot(
         df_site_and_modis.index,
-        df_site_and_modis["Reco_VPRM_first_guess"]
-        - df_site_and_modis["GPP_VPRM_first_guess"],
+        df_site_and_modis["Reco_first_guess"] - df_site_and_modis["GPP_first_guess"],
         label="Modeled NEE",
         color="green",
         linestyle="",
