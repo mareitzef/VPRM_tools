@@ -6,8 +6,8 @@ base_paths=(
     "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 )
 maxiter=100  
-opt_method="diff_evo_V10"  # method an version
-VPRM_options=("new" "old") 
+opt_method="diff_evo_V11"  # method an version
+VPRM_options= ("migli") # ("new" "old") 
 
 # Loop through each base path
 for base_path in "${base_paths[@]}"; do
