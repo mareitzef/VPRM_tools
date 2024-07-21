@@ -7,7 +7,7 @@ base_paths=(
 )
 maxiter=100  
 opt_method="diff_evo_V11"  # method an version
-VPRM_options= "migli" # ("new" "old") 
+VPRM_options=("migli") # ("new" "old") 
 
 # Loop through each base path
 for base_path in "${base_paths[@]}"; do
