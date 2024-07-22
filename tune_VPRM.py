@@ -680,30 +680,60 @@ def main():
         def get_bounds_for_migliavacca(pft):
             return [
                 (
-                    boundaries[pft]["RLAI"][0] - 2 * boundaries[pft]["RLAI"][1],
-                    boundaries[pft]["RLAI"][0] + 2 * boundaries[pft]["RLAI"][1],
+                    boundaries[pft]["RLAI"][0] - abs(boundaries[pft]["RLAI"][0]) * 2,
+                    boundaries[pft]["RLAI"][0] + boundaries[pft]["RLAI"][0] * 2,
                 ),
                 (
-                    boundaries[pft]["alphaLAI"][0] - 2 * boundaries[pft]["alphaLAI"][1],
-                    boundaries[pft]["alphaLAI"][0] + 2 * boundaries[pft]["alphaLAI"][1],
+                    boundaries[pft]["alphaLAI"][0]
+                    - boundaries[pft]["alphaLAI"][0] * 0.75,
+                    boundaries[pft]["alphaLAI"][0]
+                    + boundaries[pft]["alphaLAI"][0] * 0.75,
                 ),
                 (
-                    boundaries[pft]["k2"][0] - 2 * boundaries[pft]["k2"][1],
-                    boundaries[pft]["k2"][0] + 2 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] - boundaries[pft]["k2"][0] * 0.75,
+                    boundaries[pft]["k2"][0] + boundaries[pft]["k2"][0] * 0.75,
                 ),
                 (
-                    boundaries[pft]["E0(K)"][0] - 2 * boundaries[pft]["E0(K)"][1],
-                    boundaries[pft]["E0(K)"][0] + 2 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] - boundaries[pft]["E0(K)"][0] * 0.5,
+                    boundaries[pft]["E0(K)"][0] + boundaries[pft]["E0(K)"][0] * 0.5,
                 ),
                 (
-                    boundaries[pft]["alpha"][0] - 2 * boundaries[pft]["alpha"][1],
-                    boundaries[pft]["alpha"][0] + 2 * boundaries[pft]["alpha"][1],
+                    boundaries[pft]["alpha"][0] - boundaries[pft]["alpha"][0] * 0.75,
+                    boundaries[pft]["alpha"][0] + boundaries[pft]["alpha"][0] * 0.75,
                 ),
                 (
-                    boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
-                    boundaries[pft]["K (mm)"][0] + 2 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] - boundaries[pft]["K (mm)"][0] * 0.75,
+                    boundaries[pft]["K (mm)"][0] + boundaries[pft]["K (mm)"][0] * 0.75,
                 ),
             ]
+
+        # def get_bounds_for_migliavacca(pft):
+        #     return [
+        #         (
+        #             boundaries[pft]["RLAI"][0] - 3 * boundaries[pft]["RLAI"][1],
+        #             boundaries[pft]["RLAI"][0] + 3 * boundaries[pft]["RLAI"][1],
+        #         ),
+        #         (
+        #             boundaries[pft]["alphaLAI"][0] - 3 * boundaries[pft]["alphaLAI"][1],
+        #             boundaries[pft]["alphaLAI"][0] + 3 * boundaries[pft]["alphaLAI"][1],
+        #         ),
+        #         (
+        #             boundaries[pft]["k2"][0] - 3 * boundaries[pft]["k2"][1],
+        #             boundaries[pft]["k2"][0] + 3 * boundaries[pft]["k2"][1],
+        #         ),
+        #         (
+        #             boundaries[pft]["E0(K)"][0] - 3 * boundaries[pft]["E0(K)"][1],
+        #             boundaries[pft]["E0(K)"][0] + 3 * boundaries[pft]["E0(K)"][1],
+        #         ),
+        #         (
+        #             boundaries[pft]["alpha"][0] - 3 * boundaries[pft]["alpha"][1],
+        #             boundaries[pft]["alpha"][0] + 3 * boundaries[pft]["alpha"][1],
+        #         ),
+        #         (
+        #             boundaries[pft]["K (mm)"][0] - 3 * boundaries[pft]["K (mm)"][1],
+        #             boundaries[pft]["K (mm)"][0] + 3 * boundaries[pft]["K (mm)"][1],
+        #         ),
+        #     ]
 
     else:
         print("ERROR - you have to choose a model")
