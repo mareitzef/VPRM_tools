@@ -65,12 +65,22 @@ def calculate_AIC(n, mse, k):
 def migliavacca_LinGPP(
     T_ref, T0, E0, k_mm, k2, alpha_p, alpha_lai, max_lai, R_lai0, GPP, P, T_A
 ):
-    R_ref = R_lai0 + alpha_lai * max_lai + k2 * GPP
+    GPP_gC_per_day = GPP * 12 * 86400 / 10**6
+    R_ref = R_lai0 + alpha_lai * max_lai + k2 * GPP_gC_per_day
     f_T = np.exp(E0 * (1 / (T_ref - T0) - 1 / (T_A - T0)))
-    f_P = (alpha_lai * k_mm + P * (1 - alpha_p)) / (k_mm + P * (1 - alpha_p))
+    f_P = (alpha_p * k_mm + P * (1 - alpha_p)) / (k_mm + P * (1 - alpha_p))
 
-    reco_LinGPP = R_ref * f_T * f_P
-    return reco_LinGPP
+    reco_LinGPP_gC_per_day = R_ref * f_T * f_P
+    reco_LinGPP_mumol_per_sec = reco_LinGPP_gC_per_day * 10**6 / (86400 * 12)
+
+    # conversion factor is identical to R code below
+    # library(bigleaf)
+    # GPP_umol_CO2_per_m2_per_s <- 10
+    # GPP_gC <- umolCO2.to.gC(GPP_umol_CO2_per_m2_per_s)
+    # conv_factor <- GPP_umol_CO2_per_m2_per_s / GPP_gC
+    # cat("Conversion factor:", conv_factor, "\n")
+
+    return reco_LinGPP_mumol_per_sec
 
 
 def main():
@@ -451,8 +461,10 @@ def main():
     df_site_and_modis.reset_index(inplace=True)
 
     ############################# prepare input variables  #############################
-    # just use fluxnet qualities 0 and 1 - new in V3
-    df_site_and_modis.loc[df_site_and_modis[nee_qc] > 1, nee] = np.nan
+    # just use fluxnet qualities 0 and 1 - new in V3 - in V11 > 2 again  TODO: test when to use
+    df_site_and_modis.loc[df_site_and_modis[nee_qc] > 2, nee] = (
+        np.nan
+    )  # 0 = measured; 1 = good quality gapfill; 2 = medium; 3 = poor
     # create extra column for daytime NEE
     # TODO uncomment next 3 lines, if using NEE_VUT_REF - make automatic if needed later..
     df_site_and_modis[reco_from_nee] = df_site_and_modis[nee].copy()
@@ -727,6 +739,10 @@ def main():
                 upper_bound = global_max + 3 * max_std
                 if parameter != "RLAI":
                     lower_bound = max(lower_bound, 0)
+                if parameter == "alpha":
+                    upper_bound = min(upper_bound, 1)
+                if parameter == "K (mm)":
+                    upper_bound = min(upper_bound, 10)
 
                 global_boundaries[parameter] = (lower_bound, upper_bound)
 
@@ -870,17 +886,18 @@ def main():
 
         nan_values = df_year.isna()
         nan_sum = nan_values.sum()
+        full_year = len(df_year)
         df_year = df_year.dropna()
         df_year.reset_index(drop=True, inplace=True)
 
         if nan_sum.any():
             print(
-                f"WARNING: There are {(nan_sum).sum()} NaN values dropped from df_site_and_modis DataFrame"
+                f"WARNING: There are {(nan_sum).max()} NaN values dropped from df_site_and_modis DataFrame"
             )
-            if (nan_sum > 3500).any():
-                percent_nan = (nan_sum).any() / len(df_year) * 100
+            percent_nan = nan_sum.max() / full_year * 100
+            if percent_nan > 20:
                 print(
-                    f"WARNING: The year {year} is skipped, as more than 3500 values missing"
+                    f"WARNING: The year {year} is skipped, as more than 5% values are missing"
                 )
                 continue
 
@@ -889,9 +906,6 @@ def main():
         LSWI = df_year["LSWI"].reset_index(drop=True)
         EVI = df_year["250m_16_days_EVI"].reset_index(drop=True)
         PAR = df_year["PAR"].reset_index(drop=True)
-        # Topt = (
-        #     df_year[t_air].mean() - 5
-        # )  # estimate  T_mean here to set furst Guess o T_opt
 
         ####################### Set bounds which are valid for all PFTs ################
         if CO2_parametrization == "old":
@@ -1230,33 +1244,48 @@ def main():
             & ~np.isnan(Reco_optimized)
             & ~np.isnan(GPP_optimized)
         )
-        R2_NEE = r2_score(
-            df_year[nee][mask],
-            np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
-        )
-
-        R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
-        R2_Reco = r2_score(df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask])
-
-        rmse_GPP = np.sqrt(
-            mean_squared_error(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
-        )
-        rmse_Reco = np.sqrt(
-            mean_squared_error(
-                df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
+        if np.sum(mask) == 0:
+            warnings.warn(
+                "Found array with 0 sample(s) while a minimum of 1 is required."
             )
-        )
-        rmse_NEE = np.sqrt(
-            mean_squared_error(
+            R2_NEE = 0
+            R2_GPP = 0
+            R2_Reco = 0
+            rmse_GPP = 0
+            rmse_Reco = 0
+            rmse_NEE = 0
+            NSE_NEE = 0
+        else:
+            R2_NEE = r2_score(
                 df_year[nee][mask],
                 np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
             )
-        )
+            R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
+            R2_Reco = r2_score(
+                df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
+            )
 
-        NSE_NEE = calculate_NSE(
-            df_year[nee][mask],
-            np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
-        )
+            rmse_GPP = np.sqrt(
+                mean_squared_error(
+                    df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask]
+                )
+            )
+            rmse_Reco = np.sqrt(
+                mean_squared_error(
+                    df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
+                )
+            )
+            rmse_NEE = np.sqrt(
+                mean_squared_error(
+                    df_year[nee][mask],
+                    np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
+                )
+            )
+
+            NSE_NEE = calculate_NSE(
+                df_year[nee][mask],
+                np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
+            )
 
         ########################## Save results to Excel ##########################
         if CO2_parametrization == "old":
