@@ -136,8 +136,8 @@ def main():
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V11"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
-        single_year = False  # True for local testing, default=False
+        folder = "FLX_FR-Pue_FLUXNET2015_FULLSET_2000-2014_2-4"
+        single_year = True  # True for local testing, default=False
         year_to_plot = 2011
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -254,8 +254,8 @@ def main():
             max_lai,
             R_lai0,
             df_year[gpp],
-            df_year["P"],
-            T2M + 273.5,
+            df_year["P_avrg"],
+            T2M + 273.15,
         )
         residuals = (reco_LinGPP - df_year[reco_from_nee]) * df_year[night]
 
@@ -403,6 +403,9 @@ def main():
     df_site["PAR"] = df_site[sw_in] / PAR_conversion
     df_site.drop(columns=[sw_in], inplace=True)
 
+    # 7 day average of precipitation
+    df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean()
+
     ##################################### read  MODIS data ##################################
 
     mod_files = glob(os.path.join(modis_path, "*_MOD*.xlsx"))
@@ -503,6 +506,8 @@ def main():
         "PAR",
         "LSWI",
         "250m_16_days_EVI",
+        "P",
+        "P_avrg",
     ]
 
     # Parameters are set constant for physical reason of no PSN above and below (true for the Alps)
@@ -620,7 +625,7 @@ def main():
                 "alphaLAI": (0.42, 0.08),
                 "k2": (0.478, 0.013),
                 "E0(K)": (124.833, 4.656),
-                "alpha": (0.604, 0.065),
+                "alpha_p": (0.604, 0.065),
                 "K (mm)": (0.222, 0.070),
             },
             "DBF": {
@@ -628,7 +633,7 @@ def main():
                 "alphaLAI": (0.34, 0.10),
                 "k2": (0.247, 0.009),
                 "E0(K)": (87.655, 4.405),
-                "alpha": (0.796, 0.031),
+                "alpha_p": (0.796, 0.031),
                 "K (mm)": (0.184, 0.064),
             },
             "GRA": {
@@ -636,7 +641,7 @@ def main():
                 "alphaLAI": (1.14, 0.33),
                 "k2": (0.578, 0.062),
                 "E0(K)": (101.181, 6.362),
-                "alpha": (0.670, 0.052),
+                "alpha_p": (0.670, 0.052),
                 "K (mm)": (0.765, 1.589),
             },
             "CRO": {
@@ -644,7 +649,7 @@ def main():
                 "alphaLAI": (0.40, 0.11),
                 "k2": (0.244, 0.016),
                 "E0(K)": (129.498, 5.618),
-                "alpha": (0.934, 0.065),
+                "alpha_p": (0.934, 0.065),
                 "K (mm)": (0.035, 3.018),
             },
             "SAV": {
@@ -652,7 +657,7 @@ def main():
                 "alphaLAI": (0.57, 0.17),
                 "k2": (0.654, 0.024),
                 "E0(K)": (81.537, 7.030),
-                "alpha": (0.474, 0.018),
+                "alpha_p": (0.474, 0.018),
                 "K (mm)": (0.567, 0.119),
             },
             "SHB": {
@@ -660,7 +665,7 @@ def main():
                 "alphaLAI": (0.57, 0.17),
                 "k2": (0.354, 0.021),
                 "E0(K)": (156.746, 8.222),
-                "alpha": (0.850, 0.070),
+                "alpha_p": (0.850, 0.070),
                 "K (mm)": (0.097, 1.304),
             },
             "EBF": {
@@ -668,7 +673,7 @@ def main():
                 "alphaLAI": (0.82, 0.13),
                 "k2": (0.602, 0.044),
                 "E0(K)": (52.753, 4.351),
-                "alpha": (0.593, 0.032),
+                "alpha_p": (0.593, 0.032),
                 "K (mm)": (2.019, 1.052),
             },
             "MF": {
@@ -676,7 +681,7 @@ def main():
                 "alphaLAI": (0.44, 0.04),
                 "k2": (0.391, 0.068),
                 "E0(K)": (176.542, 8.222),
-                "alpha": (0.703, 0.083),
+                "alpha_p": (0.703, 0.083),
                 "K (mm)": (2.831, 4.847),
             },
             "WET": {
@@ -684,7 +689,7 @@ def main():
                 "alphaLAI": (0.44, 0.04),
                 "k2": (0.398, 0.013),
                 "E0(K)": (144.705, 8.762),
-                "alpha": (0.582, 0.163),
+                "alpha_p": (0.582, 0.163),
                 "K (mm)": (0.054, 0.593),
             },
         }
@@ -708,8 +713,8 @@ def main():
                     boundaries[pft]["E0(K)"][0] + 2 * boundaries[pft]["E0(K)"][1],
                 ),
                 (
-                    boundaries[pft]["alpha"][0] - 2 * boundaries[pft]["alpha"][1],
-                    boundaries[pft]["alpha"][0] + 2 * boundaries[pft]["alpha"][1],
+                    boundaries[pft]["alpha_p"][0] - 2 * boundaries[pft]["alpha_p"][1],
+                    boundaries[pft]["alpha_p"][0] + 2 * boundaries[pft]["alpha_p"][1],
                 ),
                 (
                     boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
@@ -721,10 +726,11 @@ def main():
             global_boundaries = {}
 
             # Iterate through each parameter to find global min, max, and adjusted boundaries
-            for parameter in ["RLAI", "alphaLAI", "k2", "E0(K)", "alpha", "K (mm)"]:
+            for parameter in ["RLAI", "alphaLAI", "k2", "E0(K)", "alpha_p", "K (mm)"]:
                 values = []
                 stds = []
 
+                # absolute min and max with 3 std
                 for pft, params in boundaries.items():
                     value, std = params[parameter]
                     values.append(value)
@@ -735,14 +741,34 @@ def main():
                     if parameter != "RLAI":
                         global_min = max(global_min, 0)
 
-                lower_bound = global_min - 3 * max_std
-                upper_bound = global_max + 3 * max_std
+                lower_bound = global_min - 2 * max_std
+                upper_bound = global_max + 2 * max_std
                 if parameter != "RLAI":
                     lower_bound = max(lower_bound, 0)
-                if parameter == "alpha":
+                if parameter == "alpha_p":
                     upper_bound = min(upper_bound, 1)
                 if parameter == "K (mm)":
                     upper_bound = min(upper_bound, 10)
+
+                # maximum bounds do not work
+                # if parameter != "RLAI":
+                #     lower_bound = -5
+                #     upper_bound = 10
+                # if parameter != "alphaLAI":
+                #     lower_bound = 0
+                #     upper_bound = 1
+                # if parameter != "k2":
+                #     lower_bound = 0.1
+                #     upper_bound = 2
+                # if parameter != "E0(K)":
+                #     lower_bound = 20
+                #     upper_bound = 300
+                # if parameter == "alpha_p":
+                #     lower_bound = 0
+                #     upper_bound = 1
+                # if parameter == "K (mm)":
+                #     lower_bound = 0
+                #     upper_bound = 100
 
                 global_boundaries[parameter] = (lower_bound, upper_bound)
 
@@ -855,6 +881,27 @@ def main():
             * 1000  # TODO: use correct scale 0.1 directly, now its scale from LSWI*1000=0.1
         )
         max_lai = float(max_lai)
+
+        # df_site_and_modis["TIMESTAMP_START"] = pd.to_datetime(
+        #     df_site_and_modis["TIMESTAMP_START"]
+        # )
+        # df_site_and_modis.set_index("TIMESTAMP_START", inplace=True)
+        # # gpp_daily_mean_all = (
+        # #     df_site_and_modis[gpp]
+        # #     .resample("D")
+        # #     .mean()
+        # #     .reindex(df_site_and_modis.index, method="pad")
+        # # )  # Resample and reindex the 'gpp' column with daily frequency
+        # # gpp_daily_mean_all.reset_index(drop=True, inplace=True)
+        # P_3d_avg_all = (
+        #     df_site_and_modis["P"]
+        #     .rolling(window="3D")
+        #     .mean()
+        #     .reindex(df_site_and_modis.index, method="pad")
+        # )  # Compute the 30-day rolling average of 'P'
+        # P_3d_avg_all.reset_index(drop=True, inplace=True)
+        # df_site_and_modis.reset_index(inplace=True)
+
         df_site_and_modis["GPP_first_guess"] = df_site_and_modis[gpp]
         df_site_and_modis["Reco_first_guess"] = migliavacca_LinGPP(
             T_ref,
@@ -862,13 +909,13 @@ def main():
             boundaries[target_pft]["E0(K)"][0],
             boundaries[target_pft]["K (mm)"][0],
             boundaries[target_pft]["k2"][0],
-            boundaries[target_pft]["alpha"][0],
+            boundaries[target_pft]["alpha_p"][0],
             boundaries[target_pft]["alphaLAI"][0],
             max_lai,
             boundaries[target_pft]["RLAI"][0],
             df_site_and_modis[gpp],
-            df_site_and_modis["P"],
-            T2M + 273.5,
+            df_site_and_modis["P_avrg"],
+            T2M + 273.15,
         )
 
     ###################### optimization for each site year  ####################
@@ -1009,7 +1056,7 @@ def main():
             )
             df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
             df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
+            # df_year["GPP_calc"] = df_year[gpp] # TODO make switch here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_new_GPP,
@@ -1040,7 +1087,7 @@ def main():
                     "alphaLAI": (0.42, 0.08),
                     "k2": (0.478, 0.013),
                     "E0(K)": (124.833, 4.656),
-                    "alpha": (0.604, 0.065),
+                    "alpha_p": (0.604, 0.065),
                     "K (mm)": (0.222, 0.070),
                 },
                 "DBF": {
@@ -1048,7 +1095,7 @@ def main():
                     "alphaLAI": (0.34, 0.10),
                     "k2": (0.247, 0.009),
                     "E0(K)": (87.655, 4.405),
-                    "alpha": (0.796, 0.031),
+                    "alpha_p": (0.796, 0.031),
                     "K (mm)": (0.184, 0.064),
                 },
                 "GRA": {
@@ -1056,7 +1103,7 @@ def main():
                     "alphaLAI": (1.14, 0.33),
                     "k2": (0.578, 0.062),
                     "E0(K)": (101.181, 6.362),
-                    "alpha": (0.670, 0.052),
+                    "alpha_p": (0.670, 0.052),
                     "K (mm)": (0.765, 1.589),
                 },
                 "CRO": {
@@ -1064,7 +1111,7 @@ def main():
                     "alphaLAI": (0.40, 0.11),
                     "k2": (0.244, 0.016),
                     "E0(K)": (129.498, 5.618),
-                    "alpha": (0.934, 0.065),
+                    "alpha_p": (0.934, 0.065),
                     "K (mm)": (0.035, 3.018),
                 },
                 "SAV": {
@@ -1072,7 +1119,7 @@ def main():
                     "alphaLAI": (0.57, 0.17),
                     "k2": (0.654, 0.024),
                     "E0(K)": (81.537, 7.030),
-                    "alpha": (0.474, 0.018),
+                    "alpha_p": (0.474, 0.018),
                     "K (mm)": (0.567, 0.119),
                 },
                 "SHB": {
@@ -1080,7 +1127,7 @@ def main():
                     "alphaLAI": (0.57, 0.17),
                     "k2": (0.354, 0.021),
                     "E0(K)": (156.746, 8.222),
-                    "alpha": (0.850, 0.070),
+                    "alpha_p": (0.850, 0.070),
                     "K (mm)": (0.097, 1.304),
                 },
                 "EBF": {
@@ -1088,7 +1135,7 @@ def main():
                     "alphaLAI": (0.82, 0.13),
                     "k2": (0.602, 0.044),
                     "E0(K)": (52.753, 4.351),
-                    "alpha": (0.593, 0.032),
+                    "alpha_p": (0.593, 0.032),
                     "K (mm)": (2.019, 1.052),
                 },
                 "MF": {
@@ -1096,7 +1143,7 @@ def main():
                     "alphaLAI": (0.44, 0.04),
                     "k2": (0.391, 0.068),
                     "E0(K)": (176.542, 8.222),
-                    "alpha": (0.703, 0.083),
+                    "alpha_p": (0.703, 0.083),
                     "K (mm)": (2.831, 4.847),
                 },
                 "WET": {
@@ -1104,15 +1151,15 @@ def main():
                     "alphaLAI": (0.44, 0.04),
                     "k2": (0.398, 0.013),
                     "E0(K)": (144.705, 8.762),
-                    "alpha": (0.582, 0.163),
+                    "alpha_p": (0.582, 0.163),
                     "K (mm)": (0.054, 0.593),
                 },
             }
             bounds_migli = get_bounds_for_migliavacca(boundaries, target_pft)
-            global_boundaries = get_global_bounds_for_migliavacca(boundaries)
+            # global_boundaries = get_global_bounds_for_migliavacca(boundaries)
             result = differential_evolution(
                 objective_function_migliavacca_LinGPP,
-                bounds=global_boundaries,
+                bounds=bounds_migli,
                 maxiter=maxiter,
                 disp=True,
             )
@@ -1129,7 +1176,7 @@ def main():
                 max_lai,
                 R_lai0,
                 df_year[gpp],
-                df_year["P"],
+                df_year["P_avrg"],
                 T2M + 273.5,
             )
 
@@ -1213,8 +1260,8 @@ def main():
                 max_lai,
                 R_lai0,
                 df_year[gpp],
-                df_year["P"],
-                T2M + 273.5,
+                df_year["P_avrg"],
+                T2M + 273.15,
             )
 
             Reco_optimized = Reco_optimized.tolist()
@@ -1245,9 +1292,7 @@ def main():
             & ~np.isnan(GPP_optimized)
         )
         if np.sum(mask) == 0:
-            warnings.warn(
-                "Found array with 0 sample(s) while a minimum of 1 is required."
-            )
+            print("Found array with 0 sample(s) while a minimum of 1 is required.")
             R2_NEE = 0
             R2_GPP = 0
             R2_Reco = 0
@@ -1367,11 +1412,13 @@ def main():
                     "PFT": [target_pft],
                     "Year": [year],
                     "Topt": [Topt_min],
+                    "PAR0": [optimized_params[1]],
+                    "lambd": [optimized_params[4]],
                     "RLAI": [R_lai0],
                     "alphaLAI": [alpha_lai],
                     "k2": [k2],
                     "E0(K)": [E0],
-                    "alpha": [alpha_p],
+                    "alpha_p": [alpha_p],
                     "K (mm)": [k_mm],
                     "R2_GPP": [R2_GPP],
                     "R2_Reco": [R2_Reco],

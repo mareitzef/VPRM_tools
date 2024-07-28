@@ -164,7 +164,7 @@ def plot_site_input(
     df_site_and_modis.set_index(timestamp, inplace=True)
     font_size = 12
 
-    fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(8.27, 11.69))
+    fig, axes = plt.subplots(nrows=5, ncols=2, figsize=(8.27, 11.69))
     for i, var in enumerate(variables):
         row_index = i // 2  # Calculate the row index
         col_index = i % 2  # Calculate the column index
