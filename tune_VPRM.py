@@ -106,6 +106,7 @@ def main():
     V9 - back to using using NEE not tuning (not RECO and GPP) and keep initial T_opt = T_mean -5 with min of 1°
     V10 - defining min boundary of Topt from analysis of FLUXNET data
     V11 - optimize migliacacca R_eco
+    V12 - using get_global_bounds_for_migliavacca to find better solutions
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -767,6 +768,7 @@ def main():
                 if parameter == "alpha_p":
                     upper_bound = min(upper_bound, 1)
                 if parameter == "K (mm)":
+                    lower_bound = max(lower_bound, 0)
                     upper_bound = min(upper_bound, 10)
 
                 # maximum bounds do not work
@@ -1174,11 +1176,11 @@ def main():
                     "K (mm)": (0.054, 0.593),
                 },
             }
-            bounds_migli = get_bounds_for_migliavacca(boundaries, target_pft)
-            # global_boundaries = get_global_bounds_for_migliavacca(boundaries)
+            # bounds_migli = get_bounds_for_migliavacca(boundaries, target_pft) # used for V11
+            global_boundaries = get_global_bounds_for_migliavacca(boundaries)
             result = differential_evolution(
                 objective_function_migliavacca_LinGPP,
-                bounds=bounds_migli,
+                bounds=global_boundaries,
                 maxiter=maxiter,
                 disp=True,
             )
