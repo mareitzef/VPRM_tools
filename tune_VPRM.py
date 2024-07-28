@@ -137,7 +137,7 @@ def main():
         opt_method = "diff_evo_V11"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
         folder = "FLX_FR-Pue_FLUXNET2015_FULLSET_2000-2014_2-4"
-        single_year = True  # True for local testing, default=False
+        single_year = False  # True for local testing, default=False
         year_to_plot = 2011
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -253,7 +253,7 @@ def main():
             alpha_lai,
             max_lai,
             R_lai0,
-            df_year[gpp],
+            df_year["GPP_avrg"],
             df_year["P_avrg"],
             T2M + 273.15,
         )
@@ -403,8 +403,27 @@ def main():
     df_site["PAR"] = df_site[sw_in] / PAR_conversion
     df_site.drop(columns=[sw_in], inplace=True)
 
-    # 7 day average of precipitation
-    df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean()
+    # averages of precipitation and GPP
+    # df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean().fillna(0)
+    # df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D").mean().fillna(0)
+
+    df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean().interpolate()
+    initial_mean = df_site["P"].iloc[: 7 * 48].mean()
+    df_site["P_avrg"].iloc[: 7 * 48] = (
+        df_site["P_avrg"].iloc[: 7 * 48].fillna(initial_mean)
+    )
+    final_mean = df_site["P"].iloc[-7 * 48 :].mean()
+    df_site["P_avrg"].iloc[-7 * 48 :] = (
+        df_site["P_avrg"].iloc[-7 * 48 :].fillna(final_mean)
+    )
+    df_site["P_avrg"] = df_site["P_avrg"].fillna(0)
+
+    df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D").mean().interpolate()
+    initial_mean = df_site[gpp].iloc[:48].mean()
+    df_site["GPP_avrg"].iloc[:48] = df_site["GPP_avrg"].iloc[:48].fillna(initial_mean)
+    final_mean = df_site[gpp].iloc[-48:].mean()
+    df_site["GPP_avrg"].iloc[-48:] = df_site["GPP_avrg"].iloc[-48:].fillna(final_mean)
+    df_site["GPP_avrg"] = df_site["GPP_avrg"].fillna(0)
 
     ##################################### read  MODIS data ##################################
 
@@ -506,7 +525,7 @@ def main():
         "PAR",
         "LSWI",
         "250m_16_days_EVI",
-        "P",
+        "GPP_avrg",
         "P_avrg",
     ]
 
@@ -913,7 +932,7 @@ def main():
             boundaries[target_pft]["alphaLAI"][0],
             max_lai,
             boundaries[target_pft]["RLAI"][0],
-            df_site_and_modis[gpp],
+            df_site_and_modis["GPP_avrg"],
             df_site_and_modis["P_avrg"],
             T2M + 273.15,
         )
@@ -944,7 +963,7 @@ def main():
             percent_nan = nan_sum.max() / full_year * 100
             if percent_nan > 20:
                 print(
-                    f"WARNING: The year {year} is skipped, as more than 5% values are missing"
+                    f"WARNING: The year {year} is skipped, as {percent_nan}% values are missing"
                 )
                 continue
 
@@ -1175,7 +1194,7 @@ def main():
                 alpha_lai,
                 max_lai,
                 R_lai0,
-                df_year[gpp],
+                df_year["GPP_avrg"],
                 df_year["P_avrg"],
                 T2M + 273.5,
             )
@@ -1259,7 +1278,7 @@ def main():
                 alpha_lai,
                 max_lai,
                 R_lai0,
-                df_year[gpp],
+                df_year["GPP_avrg"],
                 df_year["P_avrg"],
                 T2M + 273.15,
             )
