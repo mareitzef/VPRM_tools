@@ -107,6 +107,7 @@ def main():
     V10 - defining min boundary of Topt from analysis of FLUXNET data
     V11 - optimize migliacacca R_eco
     V12 - using get_global_bounds_for_migliavacca to find better solutions
+    V12 - using direct RECO and GPP FLUXNET tuning again as in V7/8
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -135,11 +136,11 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V11"  # version of diff evo
-        CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_FR-Pue_FLUXNET2015_FULLSET_2000-2014_2-4"
-        single_year = False  # True for local testing, default=False
-        year_to_plot = 2011
+        opt_method = "diff_evo_V13"  # version of diff evo
+        CO2_parametrization = "old"  # "old","new", "migli"
+        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        single_year = True  # True for local testing, default=False
+        year_to_plot = 2014
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -258,7 +259,8 @@ def main():
             df_year["P_avrg"],
             T2M + 273.15,
         )
-        residuals = (reco_LinGPP - df_year[reco_from_nee]) * df_year[night]
+        # residuals = (reco_LinGPP - df_year[reco_from_nee]) * df_year[night]
+        residuals = reco_LinGPP - df_year[reco_from_nee]
 
         valid_indices = ~np.isnan(residuals)
         abs_error = residuals[valid_indices]
@@ -362,7 +364,7 @@ def main():
 
     reco_from_nee = "NEE_" + XUT + "_REF_pos"  # only positive values from NEE_VUT_REF
     # test for "RECO_DT_" + XUT + "_REF" # V5 tested XUT vs VUT
-    # reco_from_nee = r_eco
+    reco_from_nee = r_eco  # for V7/8/13
     # reco_from_nee = "NEE_" + XUT + "_MEAN"  # V6: tested if NEE_VUT_MEAN hat better R2
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
@@ -490,9 +492,9 @@ def main():
     )  # 0 = measured; 1 = good quality gapfill; 2 = medium; 3 = poor
     # create extra column for daytime NEE
     # TODO uncomment next 3 lines, if using NEE_VUT_REF - make automatic if needed later..
-    df_site_and_modis[reco_from_nee] = df_site_and_modis[nee].copy()
-    # only the respiration of reco_from_nee is used
-    df_site_and_modis.loc[df_site_and_modis[reco_from_nee] < 0, reco_from_nee] = 0
+    # df_site_and_modis[reco_from_nee] = df_site_and_modis[nee].copy()
+    # # only the respiration of reco_from_nee is used
+    # df_site_and_modis.loc[df_site_and_modis[reco_from_nee] < 0, reco_from_nee] = 0
 
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
@@ -768,7 +770,7 @@ def main():
                 if parameter == "alpha_p":
                     upper_bound = min(upper_bound, 1)
                 if parameter == "K (mm)":
-                    lower_bound = max(lower_bound, 0)
+                    lower_bound = max(lower_bound, 0.01)
                     upper_bound = min(upper_bound, 10)
 
                 # maximum bounds do not work
@@ -1024,9 +1026,11 @@ def main():
                 T2M,
             )
 
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
-            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            # df_year["GPP_calc"] = df_year[gpp] # TODO make swith here if GPP_calc is needed
+            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
+            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            df_year["GPP_calc"] = df_year[
+                gpp
+            ]  # TODO make swith here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_old_GPP,
@@ -1075,9 +1079,11 @@ def main():
                 LSWI_max,
                 EVI,
             )
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
-            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            # df_year["GPP_calc"] = df_year[gpp] # TODO make switch here if GPP_calc is needed
+            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
+            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            df_year["GPP_calc"] = df_year[
+                gpp
+            ]  # TODO make switch here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_new_GPP,
@@ -1201,8 +1207,12 @@ def main():
                 T2M + 273.5,
             )
 
-            df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized.tolist())
-            df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized.tolist())
+            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
+            df_year["GPP_calc"] = df_year[
+                gpp
+            ]  # TODO make swith here if GPP_calc is needed Used for V13
+
             bounds_GPP = [
                 (Topt_min, Topt_max),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
@@ -1304,6 +1314,7 @@ def main():
             year,
             opt_method,
             maxiter,
+            gpp,
         )
         ########################## Calculate error measures ##########################
         # TODO: correlate df_year[gpp] with GPP_optimized if using gpp for optimization.
