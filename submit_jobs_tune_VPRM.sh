@@ -5,8 +5,8 @@ base_paths=(
     "/scratch/c7071034/DATA/Fluxnet2015/Europe/"
     "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 )
-maxiter=100  
-opt_method="diff_evo_V13"  # method an version
+maxiter=200  
+opt_method="diff_evo_V14"  # method an version
 VPRM_options=("migli" "new" "old") 
 
 # Loop through each base path
@@ -27,7 +27,7 @@ for base_path in "${base_paths[@]}"; do
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4G
-#SBATCH --time=420
+#SBATCH --time=555
 
 module load python
 srun python tune_VPRM.py -p "$base_path" -f "$folder_name" -i "$maxiter" -m "$opt_method" -v "$VPRM_old_or_new"

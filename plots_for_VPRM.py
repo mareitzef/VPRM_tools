@@ -9,7 +9,7 @@ def plot_measured_vs_optimized_VPRM(
     timestamp,
     df_year,
     nee,
-    reco_from_nee,
+    r_eco,
     GPP_VPRM,
     GPP_VPRM_opt,
     Reco_VPRM,
@@ -39,11 +39,11 @@ def plot_measured_vs_optimized_VPRM(
     )
     axes[0].plot(
         df_year.index,
-        df_year[reco_from_nee],  # TODO switch for V13* df_year["NIGHT"],
+        df_year[r_eco],  # TODO switch for V13* df_year["NIGHT"],
         linestyle="",
         marker="o",
         markersize=1,
-        label=reco_from_nee,
+        label=r_eco,
         color="blue",
     )
     axes[0].plot(
@@ -79,21 +79,9 @@ def plot_measured_vs_optimized_VPRM(
         linestyle="",
         marker="o",
         markersize=1,
-        label="Measured GPP",
+        label=gpp,
         color="blue",
     )
-    # df_year["GPP_calc"] = -(df_year[nee] - Reco_VPRM_opt)
-    # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-
-    # axes[1].plot(
-    #     df_year.index,
-    #     df_year["GPP_calc"],
-    #     linestyle="",
-    #     marker="o",
-    #     markersize=1,
-    #     label="'Measured' GPP (NEE - Reco_modeled )",
-    #     color="blue",
-    # )
 
     axes[1].plot(
         df_year.index,
@@ -126,7 +114,7 @@ def plot_measured_vs_optimized_VPRM(
         linestyle="",
         marker="o",
         markersize=1,
-        label="Measured NEE",
+        label=nee,
         color="blue",
     )
     axes[2].plot(

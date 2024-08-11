@@ -19,6 +19,7 @@ from plots_for_VPRM import (
 )
 import argparse
 import sys
+from permetrics import RegressionMetric
 
 
 ############################## general functions #############################################
@@ -58,7 +59,7 @@ def calculate_AIC(n, mse, k):
     Returns:
     - AIC value.
     """
-    AIC = 2 * k - np.log(mse) + 2 * k * (k + 1) / (n - k - 1)
+    AIC = n * np.log(mse) + 2 * k + 2 * k * (k + 1) / (n - k - 1)
     return AIC
 
 
@@ -107,7 +108,10 @@ def main():
     V10 - defining min boundary of Topt from analysis of FLUXNET data
     V11 - optimize migliacacca R_eco
     V12 - using get_global_bounds_for_migliavacca to find better solutions
-    V12 - using direct RECO and GPP FLUXNET tuning again as in V7/8
+    V13 - using direct RECO and GPP FLUXNET tuning again as in V7/8
+    V14 - using permetrics now for statistical evaluation and minimizing nNSE from it
+          and using GPP_NT_VUT_USTAR50, changed Topt Max as it is better to leave max open
+          removed neg. values from GPP_NT_VUT_USTAR50, verifying against NEE_VUT_USTAR50 and cleaning with its QC
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -136,9 +140,9 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V13"  # version of diff evo
-        CO2_parametrization = "old"  # "old","new", "migli"
-        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        opt_method = "diff_evo_V14"  # version of diff evo
+        CO2_parametrization = "migli"  # "old","new", "migli"
+        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
         single_year = True  # True for local testing, default=False
         year_to_plot = 2014
 
@@ -158,9 +162,12 @@ def main():
             beta,
             T2M,
         )
-
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[reco_from_nee]) * df_year[night]
-        return np.sum(residuals_Reco**2)
+        mask = ~np.isnan(df_year[r_eco])
+        evaluator = RegressionMetric(
+            df_year[r_eco][mask].to_list(), np.array(Reco_VPRM)[mask]
+        )
+        results = evaluator.get_metrics_by_list_names(["NNSE"])
+        return 1 - results["NNSE"]
 
     def objective_function_VPRM_old_GPP(x):
         Topt, PAR0, lambd = x
@@ -181,10 +188,14 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
-        # it is optomized against NEE as it is measured directly, in FLUXNET Reco and GPP are seperated by a model
-        residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
+
         del Reco_VPRM
-        return np.sum(residuals_GPP**2)
+        mask = ~np.isnan(df_year[gpp])
+        evaluator = RegressionMetric(
+            df_year[gpp][mask].to_list(), np.array(GPP_VPRM)[mask]
+        )
+        results = evaluator.get_metrics_by_list_names(["NNSE"])
+        return 1 - results["NNSE"]
 
     def objective_function_VPRM_new_Reco(x):
         (
@@ -214,8 +225,12 @@ def main():
             LSWI_max,
             EVI,
         )
-        residuals_Reco = (np.array(Reco_VPRM) - df_year[reco_from_nee]) * df_year[night]
-        return np.sum(residuals_Reco**2)
+        mask = ~np.isnan(df_year[r_eco])
+        evaluator = RegressionMetric(
+            df_year[r_eco][mask].to_list(), np.array(Reco_VPRM)[mask]
+        )
+        results = evaluator.get_metrics_by_list_names(["NNSE"])
+        return 1 - results["NNSE"]
 
     def objective_function_VPRM_new_GPP(x):
         (
@@ -238,9 +253,13 @@ def main():
             VPRM_veg_ID,
             VEGFRA,
         )
+        mask = ~np.isnan(df_year[gpp])
+        evaluator = RegressionMetric(
+            df_year[gpp][mask].to_list(), np.array(GPP_VPRM)[mask]
+        )
 
-        residuals_GPP = np.array(GPP_VPRM) - df_year["GPP_calc"]
-        return np.sum(residuals_GPP**2)
+        results = evaluator.get_metrics_by_list_names(["NNSE"])
+        return 1 - results["NNSE"]
 
     def objective_function_migliavacca_LinGPP(params):
         (R_lai0, alpha_lai, k2, E0, alpha_p, k_mm) = params
@@ -259,26 +278,27 @@ def main():
             df_year["P_avrg"],
             T2M + 273.15,
         )
-        # residuals = (reco_LinGPP - df_year[reco_from_nee]) * df_year[night]
-        residuals = reco_LinGPP - df_year[reco_from_nee]
-
-        valid_indices = ~np.isnan(residuals)
-        abs_error = residuals[valid_indices]
-
-        return np.sum(abs_error**2)
+        mask = ~np.isnan(df_year[r_eco])
+        evaluator = RegressionMetric(
+            df_year[r_eco][mask].to_list(), np.array(reco_LinGPP)[mask]
+        )
+        results = evaluator.get_metrics_by_list_names(["NNSE"])
+        return 1 - results["NNSE"]
 
     def get_Topt_per_site(df_site):
         # Clean the data
         df_site["TA_F"] = df_site["TA_F"].replace(-9999.0, np.nan)
         df_site = df_site.dropna(subset=["TA_F"])
-        df_site["GPP_DT_VUT_REF"] = df_site["GPP_DT_VUT_REF"].replace(-9999.0, np.nan)
-        df_site = df_site.dropna(subset=["GPP_DT_VUT_REF"])
+        df_site["GPP_NT_VUT_USTAR50"] = df_site["GPP_NT_VUT_USTAR50"].replace(
+            -9999.0, np.nan
+        )
+        df_site = df_site.dropna(subset=["GPP_NT_VUT_USTAR50"])
 
         # Set the values to np.nan during nighttime
 
         df_daily = (
             df_site.resample("D")
-            .agg({"TA_F": "mean", "GPP_DT_VUT_REF": "mean"})
+            .agg({"TA_F": "mean", "GPP_NT_VUT_USTAR50": "mean"})
             .dropna()
         )
         df_daily["YEAR"] = df_daily.index.year
@@ -291,7 +311,7 @@ def main():
             # Group by each degree of temperature and calculate the mean values
             df_year_Topt.loc[:, "TA_F_rounded"] = df_year_Topt["TA_F"].round(1)
             mean_values = df_year_Topt.groupby("TA_F_rounded").mean()
-            coeffs = np.polyfit(mean_values.index, mean_values["GPP_DT_VUT_REF"], 2)
+            coeffs = np.polyfit(mean_values.index, mean_values["GPP_NT_VUT_USTAR50"], 2)
             poly_fit = np.polyval(coeffs, mean_values.index)
             max_index = mean_values.index[np.argmax(poly_fit)]
             if max_index < 0:
@@ -311,7 +331,7 @@ def main():
         if len(real_Topt) > len(min_Topt):
             real_Topt_flag = True
             Topt_min = np.mean(real_Topt)
-            Topt_max = np.mean(real_Topt)
+            Topt_max = 50
         else:
             real_Topt_flag = False
             Topt_min = np.mean(min_Topt)
@@ -351,21 +371,16 @@ def main():
     timestamp = "TIMESTAMP_START"
     t_air = "TA_F"  # Air temperature, consolidated from TA_F_MDS and TA_ERA
     gpp = (
-        "GPP_DT_" + XUT + "_REF"
+        "GPP_NT_" + XUT + "_USTAR50"
     )  # Gross Primary Production, from Daytime partitioning method, reference selected from GPP versions using model efficiency (MEF).
     r_eco = (
-        "RECO_DT_" + XUT + "_REF"
+        "RECO_NT_" + XUT + "_USTAR50"
     )  # is just used for plotting and R2 out of interest
     nee = (
-        "NEE_" + XUT + "_REF"
+        "NEE_" + XUT + "_USTAR50"
     )  # Net Ecosystem Exchange, using Variable Ustar Threshold (VUT) for each year, reference selected on the basis of the model efficiency (MEF).
-    nee_qc = "NEE_" + XUT + "_REF_QC"  # Quality flag for NEE_VUT_REF
+    nee_qc = "NEE_" + XUT + "_USTAR50_QC"  # Quality flag for NEE_VUT_REF
     night = "NIGHT"  # flag for nighttime
-
-    reco_from_nee = "NEE_" + XUT + "_REF_pos"  # only positive values from NEE_VUT_REF
-    # test for "RECO_DT_" + XUT + "_REF" # V5 tested XUT vs VUT
-    reco_from_nee = r_eco  # for V7/8/13
-    # reco_from_nee = "NEE_" + XUT + "_MEAN"  # V6: tested if NEE_VUT_MEAN hat better R2
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
         timestamp,
@@ -377,7 +392,6 @@ def main():
         sw_in,
         nee_qc,
         "P",
-        # reco_from_nee,  # TODO uncomment for using NEE_VUT_MEAN
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
     df_site = pd.read_csv(file_path, usecols=columns_to_copy, converters=converters)
@@ -398,13 +412,22 @@ def main():
         df_site = filter_nan(df_site, var_i)
 
     df_site.loc[df_site[t_air] < -40, t_air] = np.nan
-    df_site.loc[df_site[sw_in] < 0, sw_in] = np.nan
+    df_site.loc[df_site[sw_in] < 0, sw_in] = 0
 
     # Conversion factors
     PAR_conversion = 0.505  #  global radiation is proportional to PAR (Rg = 0.505*PAR - Mahadevan 2008)
 
     df_site["PAR"] = df_site[sw_in] / PAR_conversion
-    df_site.drop(columns=[sw_in], inplace=True)
+    # df_site.drop(columns=[sw_in], inplace=True)
+    # see Ranit 2024 Appendix B: Data screening for model optimization
+    df_site.loc[df_site[sw_in] == 0, gpp] = 0
+    df_site.loc[df_site[gpp] < 0, gpp] = np.nan
+
+    # just use fluxnet qualities 0 and 1 --> 0 = measured; 1 = good quality gapfill; 2 = medium; 3 = poor
+    df_site.loc[df_site[nee_qc] > 1, nee] = np.nan
+    df_site.loc[df_site[nee_qc] > 1, gpp] = np.nan
+    df_site.loc[df_site[nee_qc] > 1, r_eco] = np.nan
+    # TODO: document this
 
     # averages of precipitation and GPP
     # df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean().fillna(0)
@@ -486,16 +509,6 @@ def main():
     df_site_and_modis.reset_index(inplace=True)
 
     ############################# prepare input variables  #############################
-    # just use fluxnet qualities 0 and 1 - new in V3 - in V11 > 2 again  TODO: test when to use
-    df_site_and_modis.loc[df_site_and_modis[nee_qc] > 2, nee] = (
-        np.nan
-    )  # 0 = measured; 1 = good quality gapfill; 2 = medium; 3 = poor
-    # create extra column for daytime NEE
-    # TODO uncomment next 3 lines, if using NEE_VUT_REF - make automatic if needed later..
-    # df_site_and_modis[reco_from_nee] = df_site_and_modis[nee].copy()
-    # # only the respiration of reco_from_nee is used
-    # df_site_and_modis.loc[df_site_and_modis[reco_from_nee] < 0, reco_from_nee] = 0
-
     # calculate LSWI from MODIS Bands 2 and 6
     df_site_and_modis["LSWI"] = (
         df_site_and_modis["sur_refl_b02"] - df_site_and_modis["sur_refl_b06"]
@@ -521,7 +534,6 @@ def main():
 
     variables = [
         nee,
-        reco_from_nee,
         gpp,
         r_eco,
         t_air,
@@ -853,12 +865,12 @@ def main():
             VEGFRA,
         )
         df_site_and_modis["GPP_first_guess"] = GPP_VPRM
-        if (
-            folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
-        ):  # cut values for plotting
-            df_site_and_modis.loc[
-                df_site_and_modis["GPP_first_guess"] > 30, "GPP_first_guess"
-            ] = np.nan
+        # if (
+        #     folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        # ):  # cut values for plotting
+        #     df_site_and_modis.loc[
+        #         df_site_and_modis["GPP_first_guess"] > 30, "GPP_first_guess"
+        #     ] = np.nan
         df_site_and_modis["Reco_first_guess"] = Reco_VPRM
     elif CO2_parametrization == "new":
         GPP_VPRM, Reco_VPRM = VPRM_new(
@@ -894,6 +906,26 @@ def main():
             ] = np.nan
         df_site_and_modis["Reco_first_guess"] = Reco_VPRM
     elif CO2_parametrization == "migli":
+        GPP_VPRM, Reco_VPRM = VPRM_old(
+            Topt,
+            PAR0,
+            alpha,
+            beta,
+            lambd,
+            Tmin,
+            Tmax,
+            T2M,
+            LSWI,
+            LSWI_min,
+            LSWI_max,
+            EVI,
+            PAR,
+            VPRM_veg_ID,
+            VEGFRA,
+        )
+        df_site_and_modis["GPP_first_guess"] = GPP_VPRM
+
+        # get first guess of migli
         T_ref = 288.15
         T0 = 227.13
         lai_column = [
@@ -904,28 +936,6 @@ def main():
             * 1000  # TODO: use correct scale 0.1 directly, now its scale from LSWI*1000=0.1
         )
         max_lai = float(max_lai)
-
-        # df_site_and_modis["TIMESTAMP_START"] = pd.to_datetime(
-        #     df_site_and_modis["TIMESTAMP_START"]
-        # )
-        # df_site_and_modis.set_index("TIMESTAMP_START", inplace=True)
-        # # gpp_daily_mean_all = (
-        # #     df_site_and_modis[gpp]
-        # #     .resample("D")
-        # #     .mean()
-        # #     .reindex(df_site_and_modis.index, method="pad")
-        # # )  # Resample and reindex the 'gpp' column with daily frequency
-        # # gpp_daily_mean_all.reset_index(drop=True, inplace=True)
-        # P_3d_avg_all = (
-        #     df_site_and_modis["P"]
-        #     .rolling(window="3D")
-        #     .mean()
-        #     .reindex(df_site_and_modis.index, method="pad")
-        # )  # Compute the 30-day rolling average of 'P'
-        # P_3d_avg_all.reset_index(drop=True, inplace=True)
-        # df_site_and_modis.reset_index(inplace=True)
-
-        df_site_and_modis["GPP_first_guess"] = df_site_and_modis[gpp]
         df_site_and_modis["Reco_first_guess"] = migliavacca_LinGPP(
             T_ref,
             T0,
@@ -943,7 +953,6 @@ def main():
 
     ###################### optimization for each site year  ####################
     optimized_params_df = pd.DataFrame()
-
     start_year = df_site_and_modis[timestamp].dt.year.min()
     end_year = df_site_and_modis[timestamp].dt.year.max() + 1
 
@@ -954,22 +963,22 @@ def main():
             df_site_and_modis[timestamp].dt.year == year
         ].reset_index(drop=True)
 
-        nan_values = df_year.isna()
-        nan_sum = nan_values.sum()
-        full_year = len(df_year)
-        df_year = df_year.dropna()
-        df_year.reset_index(drop=True, inplace=True)
+        # nan_values = df_year.isna()
+        # nan_sum = nan_values.sum()
+        # full_year = len(df_year)
+        # df_year = df_year.dropna()
+        # df_year.reset_index(drop=True, inplace=True)
 
-        if nan_sum.any():
-            print(
-                f"WARNING: There are {(nan_sum).max()} NaN values dropped from df_site_and_modis DataFrame"
-            )
-            percent_nan = nan_sum.max() / full_year * 100
-            if percent_nan > 20:
-                print(
-                    f"WARNING: The year {year} is skipped, as {percent_nan}% values are missing"
-                )
-                continue
+        # if nan_sum.any():
+        #     print(
+        #         f"WARNING: There are {(nan_sum).max()} NaN values dropped from df_site_and_modis DataFrame"
+        #     )
+        #     percent_nan = nan_sum.max() / full_year * 100
+        #     if percent_nan > 20:
+        #         print(
+        #             f"WARNING: The year {year} is skipped, as {percent_nan}% values are missing"
+        #         )
+        #         continue
 
         # Extract relevant columns
         T2M = df_year[t_air].reset_index(drop=True)
@@ -1026,12 +1035,6 @@ def main():
                 T2M,
             )
 
-            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
-            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            df_year["GPP_calc"] = df_year[
-                gpp
-            ]  # TODO make swith here if GPP_calc is needed
-
             result = differential_evolution(
                 objective_function_VPRM_old_GPP,
                 bounds_GPP,
@@ -1079,11 +1082,6 @@ def main():
                 LSWI_max,
                 EVI,
             )
-            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized_0)
-            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            df_year["GPP_calc"] = df_year[
-                gpp
-            ]  # TODO make switch here if GPP_calc is needed
 
             result = differential_evolution(
                 objective_function_VPRM_new_GPP,
@@ -1191,27 +1189,21 @@ def main():
                 disp=True,
             )
             R_lai0, alpha_lai, k2, E0, alpha_p, k_mm = result.x
-            # use Reco from migliavacce to tuning GPP of VPRM
-            Reco_optimized = migliavacca_LinGPP(
-                T_ref,
-                T0,
-                E0,
-                k_mm,
-                k2,
-                alpha_p,
-                alpha_lai,
-                max_lai,
-                R_lai0,
-                df_year["GPP_avrg"],
-                df_year["P_avrg"],
-                T2M + 273.5,
-            )
-
-            # df_year["GPP_calc"] = -(df_year[nee] - Reco_optimized.tolist())
-            # df_year.loc[df_year["GPP_calc"] < 0, "GPP_calc"] = 0
-            df_year["GPP_calc"] = df_year[
-                gpp
-            ]  # TODO make swith here if GPP_calc is needed Used for V13
+            # # use Reco from migliavacce to tuning GPP of VPRM
+            # Reco_optimized = migliavacca_LinGPP(
+            #     T_ref,
+            #     T0,
+            #     E0,
+            #     k_mm,
+            #     k2,
+            #     alpha_p,
+            #     alpha_lai,
+            #     max_lai,
+            #     R_lai0,
+            #     df_year["GPP_avrg"],
+            #     df_year["P_avrg"],
+            #     T2M + 273.5,
+            # )
 
             bounds_GPP = [
                 (Topt_min, Topt_max),  # Bounds for Topt
@@ -1303,7 +1295,7 @@ def main():
             timestamp,
             df_year,
             nee,
-            reco_from_nee,
+            r_eco,
             df_year["GPP_first_guess"],
             GPP_optimized,
             df_year["Reco_first_guess"],
@@ -1319,56 +1311,38 @@ def main():
         ########################## Calculate error measures ##########################
         # TODO: correlate df_year[gpp] with GPP_optimized if using gpp for optimization.
         mask = (
-            ~np.isnan(df_year[nee])
+            ~np.isnan(df_year[r_eco])
+            & ~np.isnan(df_year[gpp])
             & ~np.isnan(Reco_optimized)
             & ~np.isnan(GPP_optimized)
         )
-        if np.sum(mask) == 0:
-            print("Found array with 0 sample(s) while a minimum of 1 is required.")
-            R2_NEE = 0
-            R2_GPP = 0
-            R2_Reco = 0
-            rmse_GPP = 0
-            rmse_Reco = 0
-            rmse_NEE = 0
-            NSE_NEE = 0
-        else:
-            R2_NEE = r2_score(
-                df_year[nee][mask],
-                np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
-            )
-            R2_GPP = r2_score(df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask])
-            R2_Reco = r2_score(
-                df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
-            )
-
-            rmse_GPP = np.sqrt(
-                mean_squared_error(
-                    df_year["GPP_calc"][mask], np.array(GPP_optimized)[mask]
-                )
-            )
-            rmse_Reco = np.sqrt(
-                mean_squared_error(
-                    df_year[reco_from_nee][mask], np.array(Reco_optimized)[mask]
-                )
-            )
-            rmse_NEE = np.sqrt(
-                mean_squared_error(
-                    df_year[nee][mask],
-                    np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
-                )
-            )
-
-            NSE_NEE = calculate_NSE(
-                df_year[nee][mask],
-                np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
-            )
+        # TODO: test if better to verify against this diff
+        # df_year["reco-gpp"] = df_year[r_eco] - df_year[gpp]
+        evaluator_NEE = RegressionMetric(
+            df_year[nee][mask].tolist(),
+            np.array(Reco_optimized)[mask] - np.array(GPP_optimized)[mask],
+        )
+        results_NEE = evaluator_NEE.get_metrics_by_list_names(
+            ["RMSE", "MAE", "MAPE", "R2", "NNSE", "KGE"]
+        )
+        evaluator_GPP = RegressionMetric(
+            df_year[gpp][mask].tolist(), np.array(GPP_optimized)[mask]
+        )
+        results_GPP = evaluator_GPP.get_metrics_by_list_names(
+            ["RMSE", "MAE", "MAPE", "R2", "NNSE", "KGE"]
+        )
+        evaluator_RECO = RegressionMetric(
+            df_year[r_eco][mask].tolist(), np.array(Reco_optimized)[mask]
+        )
+        results_RECO = evaluator_RECO.get_metrics_by_list_names(
+            ["RMSE", "MAE", "MAPE", "R2", "NNSE", "KGE"]
+        )
 
         ########################## Save results to Excel ##########################
         if CO2_parametrization == "old":
             # Calculate AIC for the old model
             AIC = calculate_AIC(
-                17520, rmse_NEE**2, 5
+                len(df_year), results_NEE["RMSE"] ** 2, 5
             )  # Assuming 5 parameters for the old model
             data_to_append = pd.DataFrame(
                 {
@@ -1380,14 +1354,25 @@ def main():
                     "alpha": [optimized_params[2]],
                     "beta": [optimized_params[3]],
                     "lambd": [optimized_params[4]],
-                    "R2_GPP": [R2_GPP],
-                    "R2_Reco": [R2_Reco],
-                    "R2_NEE": [R2_NEE],
-                    "RMSE_GPP": [rmse_GPP],
-                    "RMSE_Reco": [rmse_Reco],
-                    "RMSE_NEE": [rmse_NEE],
+                    "R2_GPP": [results_GPP["R2"]],
+                    "R2_Reco": [results_RECO["R2"]],
+                    "R2_NEE": [results_NEE["R2"]],
+                    "RMSE_GPP": [results_GPP["RMSE"]],
+                    "RMSE_Reco": [results_RECO["RMSE"]],
+                    "RMSE_NEE": [results_NEE["RMSE"]],
+                    "MAE_GPP": [results_GPP["MAE"]],
+                    "MAE_Reco": [results_RECO["MAE"]],
+                    "MAE_NEE": [results_NEE["MAE"]],
+                    "MAPE_GPP": [results_GPP["MAPE"]],
+                    "MAPE_Reco": [results_RECO["MAPE"]],
+                    "MAPE_NEE": [results_NEE["MAPE"]],
+                    "KGE_GPP": [results_GPP["KGE"]],
+                    "KGE_Reco": [results_RECO["KGE"]],
+                    "KGE_NEE": [results_NEE["KGE"]],
+                    "NNSE_GPP": [results_GPP["NNSE"]],
+                    "NNSE_Reco": [results_RECO["NNSE"]],
+                    "NNSE_NEE": [results_NEE["NNSE"]],
                     "AIC": [AIC],
-                    "NSE_NEE": [NSE_NEE],
                     "Dropped_NaNs": [(nan_sum).any()],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
@@ -1399,7 +1384,7 @@ def main():
         elif CO2_parametrization == "new":
             # Calculate AIC for the new model
             AIC = calculate_AIC(
-                17520, rmse_NEE**2, 12
+                len(df_year), results_NEE["RMSE"] ** 2, 12
             )  # Assuming 5 parameters for the new model
             data_to_append = pd.DataFrame(
                 {
@@ -1418,14 +1403,25 @@ def main():
                     "theta1": [optimized_params[9]],
                     "theta2": [optimized_params[10]],
                     "theta3": [optimized_params[11]],
-                    "R2_GPP": [R2_GPP],
-                    "R2_Reco": [R2_Reco],
-                    "R2_NEE": [R2_NEE],
-                    "RMSE_GPP": [rmse_GPP],
-                    "RMSE_Reco": [rmse_Reco],
-                    "RMSE_NEE": [rmse_NEE],
+                    "R2_GPP": [results_GPP["R2"]],
+                    "R2_Reco": [results_RECO["R2"]],
+                    "R2_NEE": [results_NEE["R2"]],
+                    "RMSE_GPP": [results_GPP["RMSE"]],
+                    "RMSE_Reco": [results_RECO["RMSE"]],
+                    "RMSE_NEE": [results_NEE["RMSE"]],
+                    "MAE_GPP": [results_GPP["MAE"]],
+                    "MAE_Reco": [results_RECO["MAE"]],
+                    "MAE_NEE": [results_NEE["MAE"]],
+                    "MAPE_GPP": [results_GPP["MAPE"]],
+                    "MAPE_Reco": [results_RECO["MAPE"]],
+                    "MAPE_NEE": [results_NEE["MAPE"]],
+                    "KGE_GPP": [results_GPP["KGE"]],
+                    "KGE_Reco": [results_RECO["KGE"]],
+                    "KGE_NEE": [results_NEE["KGE"]],
+                    "NNSE_GPP": [results_GPP["NNSE"]],
+                    "NNSE_Reco": [results_RECO["NNSE"]],
+                    "NNSE_NEE": [results_NEE["NNSE"]],
                     "AIC": [AIC],
-                    "NSE_NEE": [NSE_NEE],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],
@@ -1436,7 +1432,7 @@ def main():
         elif CO2_parametrization == "migli":
             # Calculate AIC for the new model
             AIC = calculate_AIC(
-                17520, rmse_NEE**2, 12
+                len(df_year), results_NEE["RMSE"] ** 2, 8
             )  # Assuming 5 parameters for the new model
             data_to_append = pd.DataFrame(
                 {
@@ -1452,14 +1448,25 @@ def main():
                     "E0(K)": [E0],
                     "alpha_p": [alpha_p],
                     "K (mm)": [k_mm],
-                    "R2_GPP": [R2_GPP],
-                    "R2_Reco": [R2_Reco],
-                    "R2_NEE": [R2_NEE],
-                    "RMSE_GPP": [rmse_GPP],
-                    "RMSE_Reco": [rmse_Reco],
-                    "RMSE_NEE": [rmse_NEE],
+                    "R2_GPP": [results_GPP["R2"]],
+                    "R2_Reco": [results_RECO["R2"]],
+                    "R2_NEE": [results_NEE["R2"]],
+                    "RMSE_GPP": [results_GPP["RMSE"]],
+                    "RMSE_Reco": [results_RECO["RMSE"]],
+                    "RMSE_NEE": [results_NEE["RMSE"]],
+                    "MAE_GPP": [results_GPP["MAE"]],
+                    "MAE_Reco": [results_RECO["MAE"]],
+                    "MAE_NEE": [results_NEE["MAE"]],
+                    "MAPE_GPP": [results_GPP["MAPE"]],
+                    "MAPE_Reco": [results_RECO["MAPE"]],
+                    "MAPE_NEE": [results_NEE["MAPE"]],
+                    "KGE_GPP": [results_GPP["KGE"]],
+                    "KGE_Reco": [results_RECO["KGE"]],
+                    "KGE_NEE": [results_NEE["KGE"]],
+                    "NNSE_GPP": [results_GPP["NNSE"]],
+                    "NNSE_Reco": [results_RECO["NNSE"]],
+                    "NNSE_NEE": [results_NEE["NNSE"]],
                     "AIC": [AIC],
-                    "NSE_NEE": [NSE_NEE],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],
