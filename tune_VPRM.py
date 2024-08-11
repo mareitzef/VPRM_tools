@@ -141,7 +141,7 @@ def main():
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V14"  # version of diff evo
-        CO2_parametrization = "migli"  # "old","new", "migli"
+        CO2_parametrization = "old"  # "old","new", "migli"
         folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
         single_year = True  # True for local testing, default=False
         year_to_plot = 2014
@@ -1373,7 +1373,6 @@ def main():
                     "NNSE_Reco": [results_RECO["NNSE"]],
                     "NNSE_NEE": [results_NEE["NNSE"]],
                     "AIC": [AIC],
-                    "Dropped_NaNs": [(nan_sum).any()],
                     "T_mean": [df_year[t_air].mean()],
                     "T_max": [df_year[t_air].resample("D").max().mean()],
                     "lat": [latitude],
