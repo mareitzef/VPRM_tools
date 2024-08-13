@@ -23,30 +23,6 @@ from permetrics import RegressionMetric
 
 
 ############################## general functions #############################################
-def calculate_NSE(observed_values, predicted_values):
-    """
-    Calculate the Nash-Sutcliffe Efficiency (NSE).
-
-    Parameters:
-        observed_values (array-like): Observed values.
-        predicted_values (array-like): Predicted values.
-
-    Returns:
-        float: Nash-Sutcliffe Efficiency (NSE) value.
-    """
-    # Calculate mean of observed values
-    mean_observed = np.mean(observed_values)
-
-    # Calculate numerator and denominator for NSE
-    numerator = np.sum((observed_values - predicted_values) ** 2)
-    denominator = np.sum((observed_values - mean_observed) ** 2)
-
-    # Calculate NSE
-    NSE = 1 - (numerator / denominator)
-
-    return NSE
-
-
 def calculate_AIC(n, mse, k):
     """
     Calculate Akaike Information Criterion (AIC).
@@ -84,6 +60,31 @@ def migliavacca_LinGPP(
     return reco_LinGPP_mumol_per_sec
 
 
+def calculate_NNSE_randunc(observed_values, predicted_values, random_uncertainty):
+    """
+    Calculate the Nash-Sutcliffe Efficiency (NSE).
+
+    Parameters:
+        observed_values (array-like): Observed values.
+        predicted_values (array-like): Predicted values.
+
+    Returns:
+        float: Nash-Sutcliffe Efficiency (NSE) value.
+    """
+    # Calculate mean of observed values
+    mean_observed = np.mean(observed_values)
+
+    # Calculate numerator and denominator for NSE
+    numerator = np.sum((random_uncertainty * (observed_values - predicted_values)) ** 2)
+    denominator = np.sum((random_uncertainty * (observed_values - mean_observed)) ** 2)
+
+    # Calculate NSE
+    NSE = 1.0 - (numerator / denominator)
+    NNSE = 1.0 / (2.0 - NSE)
+
+    return NNSE
+
+
 def main():
     """
     This function serves as the main entry point for running the VPRM optimization process.
@@ -112,6 +113,7 @@ def main():
     V14 - using permetrics now for statistical evaluation and minimizing nNSE from it
           and using GPP_NT_VUT_USTAR50, changed Topt Max as it is better to leave max open
           removed neg. values from GPP_NT_VUT_USTAR50, verifying against NEE_VUT_USTAR50 and cleaning with its QC
+    V15 - added random uncertainty for weightet NNSE
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -140,8 +142,8 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V14"  # version of diff evo
-        CO2_parametrization = "old"  # "old","new", "migli"
+        opt_method = "diff_evo_V15"  # version of diff evo
+        CO2_parametrization = "migli"  # "old","new", "migli"
         folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
         single_year = True  # True for local testing, default=False
         year_to_plot = 2014
@@ -163,11 +165,12 @@ def main():
             T2M,
         )
         mask = ~np.isnan(df_year[r_eco])
-        evaluator = RegressionMetric(
-            df_year[r_eco][mask].to_list(), np.array(Reco_VPRM)[mask]
+        results = calculate_NNSE_randunc(
+            df_year[r_eco][mask].to_list(),
+            np.array(Reco_VPRM)[mask],
+            df_year[randunc][mask],
         )
-        results = evaluator.get_metrics_by_list_names(["NNSE"])
-        return 1 - results["NNSE"]
+        return 1 - results
 
     def objective_function_VPRM_old_GPP(x):
         Topt, PAR0, lambd = x
@@ -191,11 +194,12 @@ def main():
 
         del Reco_VPRM
         mask = ~np.isnan(df_year[gpp])
-        evaluator = RegressionMetric(
-            df_year[gpp][mask].to_list(), np.array(GPP_VPRM)[mask]
+        results = calculate_NNSE_randunc(
+            df_year[gpp][mask].to_list(),
+            np.array(GPP_VPRM)[mask],
+            df_year[randunc][mask],
         )
-        results = evaluator.get_metrics_by_list_names(["NNSE"])
-        return 1 - results["NNSE"]
+        return 1 - results
 
     def objective_function_VPRM_new_Reco(x):
         (
@@ -226,11 +230,12 @@ def main():
             EVI,
         )
         mask = ~np.isnan(df_year[r_eco])
-        evaluator = RegressionMetric(
-            df_year[r_eco][mask].to_list(), np.array(Reco_VPRM)[mask]
+        results = calculate_NNSE_randunc(
+            df_year[r_eco][mask].to_list(),
+            np.array(Reco_VPRM)[mask],
+            df_year[randunc][mask],
         )
-        results = evaluator.get_metrics_by_list_names(["NNSE"])
-        return 1 - results["NNSE"]
+        return 1 - results
 
     def objective_function_VPRM_new_GPP(x):
         (
@@ -254,12 +259,12 @@ def main():
             VEGFRA,
         )
         mask = ~np.isnan(df_year[gpp])
-        evaluator = RegressionMetric(
-            df_year[gpp][mask].to_list(), np.array(GPP_VPRM)[mask]
+        results = calculate_NNSE_randunc(
+            df_year[gpp][mask].to_list(),
+            np.array(GPP_VPRM)[mask],
+            df_year[randunc][mask],
         )
-
-        results = evaluator.get_metrics_by_list_names(["NNSE"])
-        return 1 - results["NNSE"]
+        return 1 - results
 
     def objective_function_migliavacca_LinGPP(params):
         (R_lai0, alpha_lai, k2, E0, alpha_p, k_mm) = params
@@ -279,11 +284,12 @@ def main():
             T2M + 273.15,
         )
         mask = ~np.isnan(df_year[r_eco])
-        evaluator = RegressionMetric(
-            df_year[r_eco][mask].to_list(), np.array(reco_LinGPP)[mask]
+        results = calculate_NNSE_randunc(
+            df_year[r_eco][mask].to_list(),
+            np.array(reco_LinGPP)[mask],
+            df_year[randunc][mask],
         )
-        results = evaluator.get_metrics_by_list_names(["NNSE"])
-        return 1 - results["NNSE"]
+        return 1 - results
 
     def get_Topt_per_site(df_site):
         # Clean the data
@@ -380,6 +386,7 @@ def main():
         "NEE_" + XUT + "_USTAR50"
     )  # Net Ecosystem Exchange, using Variable Ustar Threshold (VUT) for each year, reference selected on the basis of the model efficiency (MEF).
     nee_qc = "NEE_" + XUT + "_USTAR50_QC"  # Quality flag for NEE_VUT_REF
+    randunc = "NEE_VUT_USTAR50_RANDUNC"
     night = "NIGHT"  # flag for nighttime
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
     columns_to_copy = [
@@ -391,6 +398,7 @@ def main():
         nee,
         sw_in,
         nee_qc,
+        randunc,
         "P",
     ]
     converters = {k: lambda x: float(x) for k in columns_to_copy}
@@ -808,9 +816,6 @@ def main():
                 global_boundaries[parameter] = (lower_bound, upper_bound)
 
             return list(global_boundaries.values())
-
-    else:
-        print("ERROR - you have to choose a model")
 
     ###################### select first guess according to PFT ##########################
 
