@@ -6,7 +6,7 @@ base_paths=(
     "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 )
 maxiter=200  
-opt_method="diff_evo_V14"  # method an version
+opt_method="diff_evo_V15"  # method an version
 VPRM_options=("migli" "new" "old") 
 
 # Loop through each base path
