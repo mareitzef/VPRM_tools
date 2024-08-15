@@ -748,20 +748,20 @@ def main():
                     boundaries[pft]["alphaLAI"][0],
                 ),
                 (
-                    boundaries[pft]["k2"][0] - 3 * boundaries[pft]["k2"][1],
-                    boundaries[pft]["k2"][0] + 3 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] - 2 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] - 2 * boundaries[pft]["k2"][1],
                 ),
                 (
-                    boundaries[pft]["E0(K)"][0] - 3 * boundaries[pft]["E0(K)"][1],
-                    boundaries[pft]["E0(K)"][0] + 3 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] - 2 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] - 2 * boundaries[pft]["E0(K)"][1],
                 ),
                 (
-                    boundaries[pft]["alpha_p"][0] - 3 * boundaries[pft]["alpha_p"][1],
-                    boundaries[pft]["alpha_p"][0] + 3 * boundaries[pft]["alpha_p"][1],
+                    boundaries[pft]["alpha_p"][0] - 2 * boundaries[pft]["alpha_p"][1],
+                    boundaries[pft]["alpha_p"][0] - 2 * boundaries[pft]["alpha_p"][1],
                 ),
                 (
-                    boundaries[pft]["K (mm)"][0] - 3 * boundaries[pft]["K (mm)"][1],
-                    boundaries[pft]["K (mm)"][0] + 3 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
                 ),
             ]
 
