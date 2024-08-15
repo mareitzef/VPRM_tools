@@ -18,11 +18,11 @@ scp FLX_AT-Mie_files.zip c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet
 leo5
 cdflx
 
-zip_filename="all_VPRM_optimized_params_diff_evo_V14_200.zip"
+zip_filename="all_VPRM_optimized_params_diff_evo_V15_200.zip"
 #### zip VPRM files
 #zip -r $zip_filename $(find . -type f \( -name '*optimized_params_new_diff_evo_V2_100.xlsx' -o -name "*old*100.eps" -o -name "*check_input.eps" \) )
 #### whithout plots but old an new
-zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V14_200.xlsx'  \) )
+zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V15_200.xlsx'  \) )
 
 ### local
 #### download zip VPRM files from zip_filename=XYZ
@@ -36,9 +36,9 @@ scp c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet2015/$zip_filename .
 plots_for_VPRM_from_excel.ipynb
 plot_VPRM_literature.ipynb
 
-#### convert png to eps
+#### convert eps to png
 plot_filename="IT-Tor_check_input"
-gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -r600 -sOutputFile=$plot_filename.png $plot_filename.eps
+gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -r600 -sOutputFile=$plotname.png $plotname.eps
 
 #### git stuff
 ##### delete local change e.g.:

@@ -114,6 +114,7 @@ def main():
           and using GPP_NT_VUT_USTAR50, changed Topt Max as it is better to leave max open
           removed neg. values from GPP_NT_VUT_USTAR50, verifying against NEE_VUT_USTAR50 and cleaning with its QC
     V15 - added random uncertainty for weightet NNSE
+    V16 - with fides R_LAI and alpha_lai
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -142,11 +143,11 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V15"  # version of diff evo
+        opt_method = "diff_evo_V16"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
-        single_year = True  # True for local testing, default=False
-        year_to_plot = 2014
+        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
+        single_year = False  # True for local testing, default=False
+        year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -739,28 +740,28 @@ def main():
         def get_bounds_for_migliavacca(boundaries, pft):
             return [
                 (
-                    boundaries[pft]["RLAI"][0] - 2 * boundaries[pft]["RLAI"][1],
-                    boundaries[pft]["RLAI"][0] + 2 * boundaries[pft]["RLAI"][1],
+                    boundaries[pft]["RLAI"][0],
+                    boundaries[pft]["RLAI"][0],
                 ),
                 (
-                    boundaries[pft]["alphaLAI"][0] - 2 * boundaries[pft]["alphaLAI"][1],
-                    boundaries[pft]["alphaLAI"][0] + 2 * boundaries[pft]["alphaLAI"][1],
+                    boundaries[pft]["alphaLAI"][0],
+                    boundaries[pft]["alphaLAI"][0],
                 ),
                 (
-                    boundaries[pft]["k2"][0] - 2 * boundaries[pft]["k2"][1],
-                    boundaries[pft]["k2"][0] + 2 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] - 3 * boundaries[pft]["k2"][1],
+                    boundaries[pft]["k2"][0] + 3 * boundaries[pft]["k2"][1],
                 ),
                 (
-                    boundaries[pft]["E0(K)"][0] - 2 * boundaries[pft]["E0(K)"][1],
-                    boundaries[pft]["E0(K)"][0] + 2 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] - 3 * boundaries[pft]["E0(K)"][1],
+                    boundaries[pft]["E0(K)"][0] + 3 * boundaries[pft]["E0(K)"][1],
                 ),
                 (
-                    boundaries[pft]["alpha_p"][0] - 2 * boundaries[pft]["alpha_p"][1],
-                    boundaries[pft]["alpha_p"][0] + 2 * boundaries[pft]["alpha_p"][1],
+                    boundaries[pft]["alpha_p"][0] - 3 * boundaries[pft]["alpha_p"][1],
+                    boundaries[pft]["alpha_p"][0] + 3 * boundaries[pft]["alpha_p"][1],
                 ),
                 (
-                    boundaries[pft]["K (mm)"][0] - 2 * boundaries[pft]["K (mm)"][1],
-                    boundaries[pft]["K (mm)"][0] + 2 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] - 3 * boundaries[pft]["K (mm)"][1],
+                    boundaries[pft]["K (mm)"][0] + 3 * boundaries[pft]["K (mm)"][1],
                 ),
             ]
 
@@ -785,8 +786,6 @@ def main():
 
                 lower_bound = global_min - 2 * max_std
                 upper_bound = global_max + 2 * max_std
-                if parameter != "RLAI":
-                    lower_bound = max(lower_bound, 0)
                 if parameter == "alpha_p":
                     upper_bound = min(upper_bound, 1)
                 if parameter == "K (mm)":
@@ -1113,80 +1112,85 @@ def main():
         elif CO2_parametrization == "migli":
             boundaries = {
                 "ENF": {
-                    "RLAI": (1.02, 0.42),
-                    "alphaLAI": (0.42, 0.08),
+                    "RLAI": (1.02, 0),
+                    "alphaLAI": (0.42, 0),
                     "k2": (0.478, 0.013),
                     "E0(K)": (124.833, 4.656),
                     "alpha_p": (0.604, 0.065),
                     "K (mm)": (0.222, 0.070),
                 },
                 "DBF": {
-                    "RLAI": (1.27, 0.50),
-                    "alphaLAI": (0.34, 0.10),
+                    "RLAI": (1.27, 0),
+                    "alphaLAI": (0.34, 0),
                     "k2": (0.247, 0.009),
                     "E0(K)": (87.655, 4.405),
                     "alpha_p": (0.796, 0.031),
                     "K (mm)": (0.184, 0.064),
                 },
                 "GRA": {
-                    "RLAI": (0.41, 0.71),
-                    "alphaLAI": (1.14, 0.33),
+                    "RLAI": (0.41, 0),
+                    "alphaLAI": (1.14, 0),
                     "k2": (0.578, 0.062),
                     "E0(K)": (101.181, 6.362),
                     "alpha_p": (0.670, 0.052),
                     "K (mm)": (0.765, 1.589),
                 },
                 "CRO": {
-                    "RLAI": (0.25, 0.66),
-                    "alphaLAI": (0.40, 0.11),
+                    "RLAI": (0.25, 0),
+                    "alphaLAI": (0.40, 0),
                     "k2": (0.244, 0.016),
                     "E0(K)": (129.498, 5.618),
                     "alpha_p": (0.934, 0.065),
                     "K (mm)": (0.035, 3.018),
                 },
                 "SAV": {
-                    "RLAI": (0.42, 0.39),
-                    "alphaLAI": (0.57, 0.17),
+                    "RLAI": (0.42, 0),
+                    "alphaLAI": (0.57, 0),
                     "k2": (0.654, 0.024),
                     "E0(K)": (81.537, 7.030),
                     "alpha_p": (0.474, 0.018),
                     "K (mm)": (0.567, 0.119),
                 },
                 "SHB": {
-                    "RLAI": (0.42, 0.39),
-                    "alphaLAI": (0.57, 0.17),
+                    "RLAI": (0.42, 0),
+                    "alphaLAI": (0.57, 0),
                     "k2": (0.354, 0.021),
                     "E0(K)": (156.746, 8.222),
                     "alpha_p": (0.850, 0.070),
                     "K (mm)": (0.097, 1.304),
                 },
                 "EBF": {
-                    "RLAI": (-0.47, 0.50),
-                    "alphaLAI": (0.82, 0.13),
+                    "RLAI": (-0.47, 0),
+                    "alphaLAI": (0.82, 0),
                     "k2": (0.602, 0.044),
                     "E0(K)": (52.753, 4.351),
                     "alpha_p": (0.593, 0.032),
                     "K (mm)": (2.019, 1.052),
                 },
                 "MF": {
-                    "RLAI": (0.78, 0.18),
-                    "alphaLAI": (0.44, 0.04),
+                    "RLAI": (0.78, 0),
+                    "alphaLAI": (0.44, 0),
                     "k2": (0.391, 0.068),
                     "E0(K)": (176.542, 8.222),
                     "alpha_p": (0.703, 0.083),
                     "K (mm)": (2.831, 4.847),
                 },
                 "WET": {
-                    "RLAI": (0.78, 0.18),
-                    "alphaLAI": (0.44, 0.04),
+                    "RLAI": (0.78, 0),
+                    "alphaLAI": (0.44, 0),
                     "k2": (0.398, 0.013),
                     "E0(K)": (144.705, 8.762),
                     "alpha_p": (0.582, 0.163),
                     "K (mm)": (0.054, 0.593),
                 },
             }
-            # bounds_migli = get_bounds_for_migliavacca(boundaries, target_pft) # used for V11
+            per_pft_boundaries = get_bounds_for_migliavacca(
+                boundaries, target_pft
+            )  # used for V11, and again for V16 with fides R_LAI and alpha_lai
             global_boundaries = get_global_bounds_for_migliavacca(boundaries)
+            global_boundaries[0:2] = per_pft_boundaries[
+                0:2
+            ]  # overwriting boundaries for RLAI and alphaLAI in V16
             result = differential_evolution(
                 objective_function_migliavacca_LinGPP,
                 bounds=global_boundaries,
