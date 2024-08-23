@@ -143,11 +143,11 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V17"  # version of diff evo
+        opt_method = "diff_evo_V16"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
-        single_year = False  # True for local testing, default=False
-        year_to_plot = 2012
+        folder = "FLX_FR-Pue_FLUXNET2015_FULLSET_2000-2014_2-4"
+        single_year = True  # True for local testing, default=False
+        year_to_plot = 2003
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -337,11 +337,11 @@ def main():
                 min_Topt.append(max_index)
         if len(real_Topt) > len(min_Topt):
             real_Topt_flag = True
-            Topt_min = np.mean(real_Topt)
+            Topt_min = np.median(real_Topt)
             Topt_max = 50
         else:
             real_Topt_flag = False
-            Topt_min = np.mean(min_Topt)
+            Topt_min = np.median(min_Topt)
             Topt_max = 50
         print(f"Topt_min={Topt_min.round(1)} - Topt_max={Topt_max} at Site {site_name}")
         return Topt_min, Topt_max, real_Topt_flag
