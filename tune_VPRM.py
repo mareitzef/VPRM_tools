@@ -114,7 +114,7 @@ def main():
           and using GPP_NT_VUT_USTAR50, changed Topt Max as it is better to leave max open
           removed neg. values from GPP_NT_VUT_USTAR50, verifying against NEE_VUT_USTAR50 and cleaning with its QC
     V15 - added random uncertainty for weightet NNSE
-    V16 - with fides R_LAI and alpha_lai
+    V16 - with fixed R_LAI and alpha_lai and bug fix rolling window 7 is centered now, not into future any more
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -143,7 +143,7 @@ def main():
     else:  # to run locally for single cases
         base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V16"  # version of diff evo
+        opt_method = "diff_evo_V17"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
         folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
         single_year = False  # True for local testing, default=False
@@ -439,25 +439,17 @@ def main():
     # TODO: document this
 
     # averages of precipitation and GPP
-    # df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean().fillna(0)
-    # df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D").mean().fillna(0)
-
-    df_site["P_avrg"] = df_site["P"].rolling(window="7D").mean().interpolate()
+    # Calculate the rolling mean for the past 7 days (not centered)
+    df_site["P_avrg"] = df_site["P"].rolling(window="7D", center=False).mean()
     initial_mean = df_site["P"].iloc[: 7 * 48].mean()
     df_site["P_avrg"].iloc[: 7 * 48] = (
         df_site["P_avrg"].iloc[: 7 * 48].fillna(initial_mean)
     )
-    final_mean = df_site["P"].iloc[-7 * 48 :].mean()
-    df_site["P_avrg"].iloc[-7 * 48 :] = (
-        df_site["P_avrg"].iloc[-7 * 48 :].fillna(final_mean)
-    )
     df_site["P_avrg"] = df_site["P_avrg"].fillna(0)
 
-    df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D").mean().interpolate()
+    df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D", center=False).mean()
     initial_mean = df_site[gpp].iloc[:48].mean()
     df_site["GPP_avrg"].iloc[:48] = df_site["GPP_avrg"].iloc[:48].fillna(initial_mean)
-    final_mean = df_site[gpp].iloc[-48:].mean()
-    df_site["GPP_avrg"].iloc[-48:] = df_site["GPP_avrg"].iloc[-48:].fillna(final_mean)
     df_site["GPP_avrg"] = df_site["GPP_avrg"].fillna(0)
 
     ##################################### read  MODIS data ##################################
@@ -1322,6 +1314,7 @@ def main():
         mask = (
             ~np.isnan(df_year[r_eco])
             & ~np.isnan(df_year[gpp])
+            & ~np.isnan(df_year[nee])
             & ~np.isnan(Reco_optimized)
             & ~np.isnan(GPP_optimized)
         )
