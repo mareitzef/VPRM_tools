@@ -26,6 +26,7 @@ zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V16
 
 ### local
 #### download zip VPRM files from zip_filename=XYZ
+cd Downloads/Fluxnet_Data/all_tuned_params/
 scp c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet2015/$zip_filename .
 #### run script to unzip and move into folders
 ./unzip_and_mv $zip_filename 
@@ -37,7 +38,7 @@ plots_for_VPRM_from_excel.ipynb
 plot_VPRM_literature.ipynb
 
 #### convert eps to png
-plot_filename="IT-Tor_check_input"
+plotname="IT-Tor_check_input"
 gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -r600 -sOutputFile=$plotname.png $plotname.eps
 
 #### git stuff

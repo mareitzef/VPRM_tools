@@ -145,9 +145,9 @@ def main():
         maxiter = 1  # (default=100 takes ages)
         opt_method = "diff_evo_V16"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_FR-Pue_FLUXNET2015_FULLSET_2000-2014_2-4"
+        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
         single_year = True  # True for local testing, default=False
-        year_to_plot = 2003
+        year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -928,7 +928,7 @@ def main():
             col for col in df_site_and_modis.columns if col.startswith("Lai_")
         ]
         max_lai = (
-            df_site_and_modis[lai_column].max()
+            df_site_and_modis[lai_column].quantile(0.95)
             * 1000  # TODO: use correct scale 0.1 directly, now its scale from LSWI*1000=0.1
         )
         max_lai = float(max_lai)
@@ -1218,6 +1218,7 @@ def main():
                 maxiter=maxiter,  # Number of generations
                 disp=True,
             )
+            # TODO remove:
             optimized_params = result.x
 
             [Topt, PAR0, lambd] = result.x
