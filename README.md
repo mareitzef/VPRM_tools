@@ -45,3 +45,4 @@ gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -r600 -sOutputFile=$plo
 ##### delete local change e.g.:
 git checkout -- submit_jobs_tune_VPRM.sh
 
+ok
