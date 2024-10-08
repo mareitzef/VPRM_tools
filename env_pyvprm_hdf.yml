@@ -1,0 +1,14 @@
+name: pyvprm
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - esmpy
+  - esmf
+  - netcdf4
+  - dask
+  - numpy
+  - rioxarray
+  - rasterio
+  - proj-data
