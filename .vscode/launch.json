@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "python": "/scratch/c7071034/conda_envs/py_basic/bin/python"
+        },
+        {
             "type": "R-Debugger",
             "name": "Launch R-Workspace",
             "request": "launch",

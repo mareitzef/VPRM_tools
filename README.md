@@ -18,15 +18,16 @@ scp FLX_AT-Mie_files.zip c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet
 leo5
 cdflx
 
-zip_filename="all_VPRM_optimized_params_diff_evo_V16_200.zip"
+zip_filename="all_VPRM_optimized_params_diff_evo_V18_200.zip"
 #### zip VPRM files
 #zip -r $zip_filename $(find . -type f \( -name '*optimized_params_new_diff_evo_V2_100.xlsx' -o -name "*old*100.eps" -o -name "*check_input.eps" \) )
+zip -r $zip_filename $(find . -type f \( -name '*_diff_evo_V18_200.*'  \) )
 #### whithout plots but old an new
-zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V16_200.xlsx'  \) )
+zip -r $zip_filename $(find . -type f \( -name '*optimized_params_*_diff_evo_V18_200.xlsx'  \) )
 
 ### local
 #### download zip VPRM files from zip_filename=XYZ
-cd Downloads/Fluxnet_Data/all_tuned_params/
+cd /home/madse/Downloads/Fluxnet_Data/all_tuned_params
 scp c7071034@leo5.uibk.ac.at:/scratch/c7071034/DATA/Fluxnet2015/$zip_filename .
 #### run script to unzip and move into folders
 ./unzip_and_mv $zip_filename 

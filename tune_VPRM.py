@@ -115,6 +115,8 @@ def main():
           removed neg. values from GPP_NT_VUT_USTAR50, verifying against NEE_VUT_USTAR50 and cleaning with its QC
     V15 - added random uncertainty for weightet NNSE
     V16 - with fixed R_LAI and alpha_lai and bug fix rolling window 7 is centered now, not into future any more
+    V17 - with lai_max as 95 percentile
+    V18 - T_opt constant again to reduce variation of parameters and to run specific T_opts for certain sites in 2012
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -138,15 +140,15 @@ def main():
         opt_method = args.opt_method
         CO2_parametrization = args.CO2_parametrization
         folder = args.folder
-        single_year = False  # only for local testing
-        year_to_plot = 2000  # only for local testing
+        single_year = False  # set true to run only one year. For 2012 there are specific Topt values for chosen sites.
+        year_to_plot = 2000
     else:  # to run locally for single cases
-        base_path = "/home/madse/Downloads/Fluxnet_Data/"
-        maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V16"  # version of diff evo
-        CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
-        single_year = True  # True for local testing, default=False
+        base_path = "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
+        maxiter = 100  # (default=100 takes ages)
+        opt_method = "diff_evo_V18_2012"  # version of diff evo
+        CO2_parametrization = "old"  # "old","new", "migli"
+        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
+        single_year = True  # mainly for local testing, default=False
         year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
@@ -292,59 +294,59 @@ def main():
         )
         return 1 - results
 
-    def get_Topt_per_site(df_site):
-        # Clean the data
-        df_site["TA_F"] = df_site["TA_F"].replace(-9999.0, np.nan)
-        df_site = df_site.dropna(subset=["TA_F"])
-        df_site["GPP_NT_VUT_USTAR50"] = df_site["GPP_NT_VUT_USTAR50"].replace(
-            -9999.0, np.nan
-        )
-        df_site = df_site.dropna(subset=["GPP_NT_VUT_USTAR50"])
+    # def get_Topt_per_site(df_site):
+    #     # Clean the data
+    #     df_site["TA_F"] = df_site["TA_F"].replace(-9999.0, np.nan)
+    #     df_site = df_site.dropna(subset=["TA_F"])
+    #     df_site["GPP_NT_VUT_USTAR50"] = df_site["GPP_NT_VUT_USTAR50"].replace(
+    #         -9999.0, np.nan
+    #     )
+    #     df_site = df_site.dropna(subset=["GPP_NT_VUT_USTAR50"])
 
-        # Set the values to np.nan during nighttime
+    #     # Set the values to np.nan during nighttime
 
-        df_daily = (
-            df_site.resample("D")
-            .agg({"TA_F": "mean", "GPP_NT_VUT_USTAR50": "mean"})
-            .dropna()
-        )
-        df_daily["YEAR"] = df_daily.index.year
-        years = df_daily["YEAR"].unique()
+    #     df_daily = (
+    #         df_site.resample("D")
+    #         .agg({"TA_F": "mean", "GPP_NT_VUT_USTAR50": "mean"})
+    #         .dropna()
+    #     )
+    #     df_daily["YEAR"] = df_daily.index.year
+    #     years = df_daily["YEAR"].unique()
 
-        real_Topt = []
-        min_Topt = []
-        for year in years:
-            df_year_Topt = df_daily[df_daily["YEAR"] == year].copy()
-            # Group by each degree of temperature and calculate the mean values
-            df_year_Topt.loc[:, "TA_F_rounded"] = df_year_Topt["TA_F"].round(1)
-            mean_values = df_year_Topt.groupby("TA_F_rounded").mean()
-            coeffs = np.polyfit(mean_values.index, mean_values["GPP_NT_VUT_USTAR50"], 2)
-            poly_fit = np.polyval(coeffs, mean_values.index)
-            max_index = mean_values.index[np.argmax(poly_fit)]
-            if max_index < 0:
-                max_index = np.nan
-            max_value = poly_fit[np.argmax(poly_fit)]
+    #     real_Topt = []
+    #     min_Topt = []
+    #     for year in years:
+    #         df_year_Topt = df_daily[df_daily["YEAR"] == year].copy()
+    #         # Group by each degree of temperature and calculate the mean values
+    #         df_year_Topt.loc[:, "TA_F_rounded"] = df_year_Topt["TA_F"].round(1)
+    #         mean_values = df_year_Topt.groupby("TA_F_rounded").mean()
+    #         coeffs = np.polyfit(mean_values.index, mean_values["GPP_NT_VUT_USTAR50"], 2)
+    #         poly_fit = np.polyval(coeffs, mean_values.index)
+    #         max_index = mean_values.index[np.argmax(poly_fit)]
+    #         if max_index < 0:
+    #             max_index = np.nan
+    #         max_value = poly_fit[np.argmax(poly_fit)]
 
-            if max_index < df_year_Topt["TA_F_rounded"].max():
-                print(
-                    f"Topt={max_index} is real with GPP={max_value.round(2)} for {year} at Site {site_name}"
-                )
-                real_Topt.append(max_index)
-            else:
-                print(
-                    f"Topt={max_index} is a minimum with GPP={max_value.round(1)} for {year} at Site {site_name}"
-                )
-                min_Topt.append(max_index)
-        if len(real_Topt) > len(min_Topt):
-            real_Topt_flag = True
-            Topt_min = np.median(real_Topt)
-            Topt_max = 50
-        else:
-            real_Topt_flag = False
-            Topt_min = np.median(min_Topt)
-            Topt_max = 50
-        print(f"Topt_min={Topt_min.round(1)} - Topt_max={Topt_max} at Site {site_name}")
-        return Topt_min, Topt_max, real_Topt_flag
+    #         if max_index < df_year_Topt["TA_F_rounded"].max():
+    #             print(
+    #                 f"Topt={max_index} is real with GPP={max_value.round(2)} for {year} at Site {site_name}"
+    #             )
+    #             real_Topt.append(max_index)
+    #         else:
+    #             print(
+    #                 f"Topt={max_index} is a minimum with GPP={max_value.round(1)} for {year} at Site {site_name}"
+    #             )
+    #             min_Topt.append(max_index)
+    #     if len(real_Topt) > len(min_Topt):
+    #         real_Topt_flag = True
+    #         Topt_min = np.median(real_Topt)
+    #         Topt_max = 50
+    #     else:
+    #         real_Topt_flag = False
+    #         Topt_min = np.median(min_Topt)
+    #         Topt_max = 50
+    #     print(f"Topt_min={Topt_min.round(1)} - Topt_max={Topt_max} at Site {site_name}")
+    #     return Topt_min, Topt_max, real_Topt_flag
 
     ###########################################################################################
 
@@ -549,7 +551,7 @@ def main():
     Tmin = 0
     Tmax = 45
 
-    Topt_min, Topt_max, real_Topt_flag = get_Topt_per_site(df_site)
+    # Topt_min, Topt_max, real_Topt_flag = get_Topt_per_site(df_site)
 
     #############################  first guess  of parameters #########################
     # adopted from VPRM_table_Europe with values for Wetland from Gourdji 2022
@@ -569,15 +571,7 @@ def main():
             ],
             "alpha": [0.1797, 0.1495, 0.2258, 0.0239, 0.111, 0.1699, 0.0881],
             "beta": [0.8800, 0.8233, 0.4321, 0.0000, 0.82, -0.0144, 0.5843],
-            "T_opt": [
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-            ],
+            "T_opt": [20.0, 20.0, 20.0, 20.0, 20.0, 22.0, 18.0],
         }
     ###################### table from Gourdji 2022 for VPRM_new ############################
     elif CO2_parametrization == "new":
@@ -640,16 +634,7 @@ def main():
                 0.0090,
                 0.0156,
             ],
-            "T_opt": [
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-                Topt_min,
-            ],  # TODO: define for Europe
+            "T_opt": [20.0, 20.0, 20.0, 20.0, 20.0, 22.0, 18.0],
         }
 
     if CO2_parametrization == "migli":
@@ -810,7 +795,6 @@ def main():
 
     ###################### select first guess according to PFT ##########################
 
-    # Topt = 20.0  # T_opt was constant before V8
     if CO2_parametrization == "old" or CO2_parametrization == "migli":
         df_VPRM_table_first_guess = pd.DataFrame(VPRM_table_first_guess)
         parameters = df_VPRM_table_first_guess[
@@ -952,6 +936,33 @@ def main():
     start_year = df_site_and_modis[timestamp].dt.year.min()
     end_year = df_site_and_modis[timestamp].dt.year.max() + 1
 
+    T_opt = {
+        "ENF": 14.25,
+        "DBF": 23.58,
+        "MF": 18.41,
+        "SHB": 20.0,
+        "WET": 17.64,
+        "CRO": 22.0,
+        "GRA": 15.88,
+    }  # T_opt constant again to reduce variation of parameters in V18
+    if single_year and year_to_plot == 2012:
+        print("Custom Topt for 2012 and chosen sites.")
+        T_opt_site = {
+            "DE-Hai": 27.00,
+            "CH-Dav": 9.70,
+            "DE-Lkb": 18.81,
+            "IT-Lav": 14.52,
+            "IT-Ren": 11.90,
+            "AT-Neu": 13.01,
+            "IT-MBo": 16.28,
+            "IT-Tor": 18.81,
+            "CH-Lae": 17.44,
+        }
+        try:
+            T_opt[target_pft] = T_opt_site[site_name]
+        except:
+            print(f"The site {site_name} has no specific T_opt for 2012")
+    Topt = T_opt[target_pft]
     # for year in range(start_year, start_year + 3):  # TODO: set years here manually
     for year in range(start_year, end_year):
         # Filter data for the current year
@@ -989,13 +1000,13 @@ def main():
                 (0.01, 6),  # Bounds for beta
             ]
             bounds_GPP = [
-                (Topt_min, Topt_max),  # Bounds for Topt
+                (Topt, Topt),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
         elif CO2_parametrization == "new":
             bounds_GPP = [
-                (Topt_min, Topt_max),  # Bounds for Topt
+                (Topt, Topt),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
@@ -1207,7 +1218,7 @@ def main():
             # )
 
             bounds_GPP = [
-                (Topt_min, Topt_max),  # Bounds for Topt
+                (Topt, Topt),  # Bounds for Topt
                 (1, 6000),  # Bounds for PAR0
                 (0.01, 1),  # Bounds for lambd
             ]
@@ -1352,7 +1363,7 @@ def main():
                     "site_ID": [site_name],
                     "PFT": [target_pft],
                     "Year": [year],
-                    "Topt": [optimized_params[0]],
+                    "Topt": [Topt],
                     "PAR0": [optimized_params[1]],
                     "alpha": [optimized_params[2]],
                     "beta": [optimized_params[3]],
@@ -1393,7 +1404,7 @@ def main():
                     "site_ID": [site_name],
                     "PFT": [target_pft],
                     "Year": [year],
-                    "Topt": [optimized_params[0]],
+                    "Topt": [Topt],
                     "PAR0": [optimized_params[1]],
                     "lambd": [optimized_params[2]],
                     "beta": [optimized_params[3]],
@@ -1441,7 +1452,7 @@ def main():
                     "site_ID": [site_name],
                     "PFT": [target_pft],
                     "Year": [year],
-                    "Topt": [Topt_min],
+                    "Topt": [Topt],
                     "PAR0": [optimized_params[1]],
                     "lambd": [optimized_params[4]],
                     "RLAI": [R_lai0],

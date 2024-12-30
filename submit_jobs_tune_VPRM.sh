@@ -5,8 +5,8 @@ base_paths=(
     "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 )   # "/scratch/c7071034/DATA/Fluxnet2015/Europe/"
 maxiter=200  
-opt_method="diff_evo_V17"  # method an version
-VPRM_options=("migli" "new" "old") # "new" "old"
+opt_method="diff_evo_V18"  # method an version
+VPRM_options=("old") # "migli" "new" "old"
 
 # Loop through each base path
 for base_path in "${base_paths[@]}"; do
@@ -26,9 +26,12 @@ for base_path in "${base_paths[@]}"; do
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4G
-#SBATCH --time=555
+#SBATCH --time=120
 
-module load python
+module purge
+module load Anaconda3/2023.03/miniconda-base-2023.03
+eval "\$($UIBK_CONDA_DIR/bin/conda shell.bash hook)"
+conda activate /scratch/c7071034/conda_envs/py_basic
 srun python tune_VPRM.py -p "$base_path" -f "$folder_name" -i "$maxiter" -m "$opt_method" -v "$VPRM_old_or_new"
 EOF
 

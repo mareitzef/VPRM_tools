@@ -146,8 +146,8 @@ def plot_measured_vs_optimized_VPRM(
         + str(opt_method)
         + "_"
         + str(maxiter)
-        + ".eps",
-        dpi=300,
+        + ".png",
+        dpi=200,
         bbox_inches="tight",
     )
     plt.close(fig)
@@ -186,8 +186,8 @@ def plot_site_input(
     axes[0, 0].set_title(site_name + " - input data", fontsize=font_size + 2)
     plt.tight_layout()
     plt.savefig(
-        base_path + folder + "/" + site_name + "_check_input.eps",
-        dpi=300,
+        base_path + folder + "/" + site_name + "_check_input.png",
+        dpi=200,
         bbox_inches="tight",
     )
     plt.close(fig)
@@ -278,8 +278,8 @@ def plot_measured_vs_modeled(
         + site_name
         + "_first_guess_fluxes_VPRM_"
         + VPRM_old_or_new
-        + "_all_years.eps",
-        dpi=300,
+        + "_all_years.png",
+        dpi=200,
         bbox_inches="tight",
     )
     plt.close(fig)
