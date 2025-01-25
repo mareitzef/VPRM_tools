@@ -149,6 +149,12 @@ def main():
         CO2_parametrization = "old"  # "old","new", "migli"
         folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
         single_year = True  # mainly for local testing, default=False
+        base_path = "/home/madse/Downloads/Fluxnet_Data/"
+        maxiter = 1  # (default=100 takes ages)
+        opt_method = "diff_evo_V17"  # version of diff evo
+        CO2_parametrization = "old"  # "old","new", "migli"
+        folder = "FLX_IT-Ren_FLUXNET2015_FULLSET_1998-2013_1-4"
+        single_year = True  # True for local testing, default=False
         year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
