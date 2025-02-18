@@ -4,7 +4,6 @@ from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution
-from sklearn.metrics import r2_score, mean_squared_error
 from VPRM import (
     VPRM_old,
     VPRM_old_only_Reco,
@@ -17,6 +16,7 @@ from plots_for_VPRM import (
     plot_site_input,
     plot_measured_vs_modeled,
 )
+from pModel import pModel_subdaily
 import argparse
 import sys
 from permetrics import RegressionMetric
@@ -117,6 +117,7 @@ def main():
     V16 - with fixed R_LAI and alpha_lai and bug fix rolling window 7 is centered now, not into future any more
     V17 - with lai_max as 95 percentile
     V18 - T_opt constant again to reduce variation of parameters and to run specific T_opts for certain sites in 2012
+    V19 - migli is calculated together with pmodel (pmodel is not optimized)
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -144,15 +145,9 @@ def main():
         year_to_plot = 2000
     else:  # to run locally for single cases
         base_path = "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
-        maxiter = 100  # (default=100 takes ages)
-        opt_method = "diff_evo_V18_2012"  # version of diff evo
-        CO2_parametrization = "old"  # "old","new", "migli"
-        folder = "FLX_CH-Oe2_FLUXNET2015_FULLSET_2004-2014_1-4"
-        single_year = True  # mainly for local testing, default=False
-        base_path = "/home/madse/Downloads/Fluxnet_Data/"
         maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V17"  # version of diff evo
-        CO2_parametrization = "old"  # "old","new", "migli"
+        opt_method = "diff_evo_V18_2012"  # version of diff evo
+        CO2_parametrization = "migli"  # "old","new", "migli"
         folder = "FLX_IT-Ren_FLUXNET2015_FULLSET_1998-2013_1-4"
         single_year = True  # True for local testing, default=False
         year_to_plot = 2012
@@ -398,10 +393,18 @@ def main():
     randunc = "NEE_VUT_USTAR50_RANDUNC"
     night = "NIGHT"  # flag for nighttime
     sw_in = "SW_IN_F"  # Shortwave radiation, incoming consolidated from SW_IN_F_MDS and SW_IN_ERA (negative values set to zero)
+    ppdf = "PPFD_IN"  # Photosynthetic Photon Flux Density, incoming
+    vpd = "VPD_F"  # Vapour Pressure Deficit
+    co2 = "CO2_F_MDS"  # CO2 concentration
+    pa_f = "PA_F"  # Atmospheric pressure
     columns_to_copy = [
         timestamp,
         night,
         t_air,
+        ppdf,
+        vpd,
+        co2,
+        pa_f,
         gpp,
         r_eco,
         nee,
@@ -892,25 +895,8 @@ def main():
             ] = np.nan
         df_site_and_modis["Reco_first_guess"] = Reco_VPRM
     elif CO2_parametrization == "migli":
-        GPP_VPRM, Reco_VPRM = VPRM_old(
-            Topt,
-            PAR0,
-            alpha,
-            beta,
-            lambd,
-            Tmin,
-            Tmax,
-            T2M,
-            LSWI,
-            LSWI_min,
-            LSWI_max,
-            EVI,
-            PAR,
-            VPRM_veg_ID,
-            VEGFRA,
-        )
-        df_site_and_modis["GPP_first_guess"] = GPP_VPRM
-
+        # there is no first guess for the pModel
+        df_site_and_modis["GPP_first_guess"] = np.nan
         # get first guess of migli
         T_ref = 288.15
         T0 = 227.13
@@ -1207,45 +1193,6 @@ def main():
                 disp=True,
             )
             R_lai0, alpha_lai, k2, E0, alpha_p, k_mm = result.x
-            # # use Reco from migliavacce to tuning GPP of VPRM
-            # Reco_optimized = migliavacca_LinGPP(
-            #     T_ref,
-            #     T0,
-            #     E0,
-            #     k_mm,
-            #     k2,
-            #     alpha_p,
-            #     alpha_lai,
-            #     max_lai,
-            #     R_lai0,
-            #     df_year["GPP_avrg"],
-            #     df_year["P_avrg"],
-            #     T2M + 273.5,
-            # )
-
-            bounds_GPP = [
-                (Topt, Topt),  # Bounds for Topt
-                (1, 6000),  # Bounds for PAR0
-                (0.01, 1),  # Bounds for lambd
-            ]
-
-            result = differential_evolution(
-                objective_function_VPRM_old_GPP,
-                bounds_GPP,
-                maxiter=maxiter,  # Number of generations
-                disp=True,
-            )
-            # TODO remove:
-            optimized_params = result.x
-
-            [Topt, PAR0, lambd] = result.x
-            optimized_params = [
-                Topt,
-                PAR0,
-                alpha,
-                beta,
-                lambd,
-            ]
 
         ############### Calculate model predictions with optimized parameters ###########
         if CO2_parametrization == "old":
@@ -1278,19 +1225,9 @@ def main():
                 VEGFRA,
             )
         elif CO2_parametrization == "migli":
-            GPP_optimized, Reco_optimized_VPRM = VPRM_old(
-                *optimized_params,
-                Tmin,
-                Tmax,
-                T2M,
-                LSWI,
-                LSWI_min,
-                LSWI_max,
-                EVI,
-                PAR,
-                VPRM_veg_ID,
-                VEGFRA,
-            )
+            # TODO: there are no parameters but can we find settings to optimize?
+            GPP_optimized = pModel_subdaily(df_site_and_modis)
+
             Reco_optimized = migliavacca_LinGPP(
                 T_ref,
                 T0,
@@ -1459,8 +1396,6 @@ def main():
                     "PFT": [target_pft],
                     "Year": [year],
                     "Topt": [Topt],
-                    "PAR0": [optimized_params[1]],
-                    "lambd": [optimized_params[4]],
                     "RLAI": [R_lai0],
                     "alphaLAI": [alpha_lai],
                     "k2": [k2],
