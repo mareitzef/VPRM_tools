@@ -4,9 +4,9 @@
 base_paths=(
     "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
 )   # "/scratch/c7071034/DATA/Fluxnet2015/Europe/"
-maxiter=100  
-opt_method="diff_evo_V19"  # method and version
-VPRM_options=("migli" "old") # "migli" "new" "old"
+maxiter=10
+opt_method="diff_evo_V20"  # method and version
+VPRM_options=("old") # "migli" "new" "old"
 
 # Loop through each base path
 for base_path in "${base_paths[@]}"; do
@@ -24,8 +24,8 @@ for base_path in "${base_paths[@]}"; do
 #!/bin/bash
 #SBATCH --job-name=tune_VPRM_${folder_name}_${VPRM_old_or_new}
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=4G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem-per-cpu=2G
 #SBATCH --time=120
 
 module purge

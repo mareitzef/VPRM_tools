@@ -4,6 +4,7 @@ from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution
+from scipy.optimize import shgo
 from VPRM import (
     VPRM_old,
     VPRM_old_only_Reco,
@@ -62,7 +63,7 @@ def migliavacca_LinGPP(
 
 def calculate_NNSE_randunc(observed_values, predicted_values, random_uncertainty):
     """
-    Calculate the Nash-Sutcliffe Efficiency (NSE).
+    Calculate the Normalized Nash-Sutcliffe Efficiency (NNSE) weighted by random uncertainty.
 
     Parameters:
         observed_values (array-like): Observed values.
@@ -74,15 +75,26 @@ def calculate_NNSE_randunc(observed_values, predicted_values, random_uncertainty
     # Calculate mean of observed values
     mean_observed = np.mean(observed_values)
 
+    # Check availability of random uncertainty (>80% non-NaN values)
+    valid_uncertainty = np.isfinite(random_uncertainty)
+    if np.sum(valid_uncertainty) / len(random_uncertainty) < 0.8:
+        random_uncertainty = np.ones_like(random_uncertainty)
+
     # Calculate numerator and denominator for NSE
     numerator = np.sum((random_uncertainty * (observed_values - predicted_values)) ** 2)
     denominator = np.sum((random_uncertainty * (observed_values - mean_observed)) ** 2)
 
-    # Calculate NSE
+    if denominator == 0 or not np.isfinite(denominator):
+        return np.nan
+
     NSE = 1.0 - (numerator / denominator)
+
+    if NSE >= 2.0:
+        return np.nan
+
     NNSE = 1.0 / (2.0 - NSE)
 
-    return NNSE
+    return np.nan_to_num(NNSE)
 
 
 def main():
@@ -117,7 +129,8 @@ def main():
     V16 - with fixed R_LAI and alpha_lai and bug fix rolling window 7 is centered now, not into future any more
     V17 - with lai_max as 95 percentile
     V18 - T_opt constant again to reduce variation of parameters and to run specific T_opts for certain sites in 2012
-    V19 - migli is calculated together with pmodel (pmodel is not optimized)
+    V19 - migli is calculated together with pmodel - pmodel is optimized against memory effect
+    V20 - pmodel is optimized also against window_center and half_width
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
@@ -145,12 +158,12 @@ def main():
         year_to_plot = 2000
     else:  # to run locally for single cases
         base_path = "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
-        maxiter = 1  # (default=100 takes ages)
-        opt_method = "diff_evo_V18_2012"  # version of diff evo
+        maxiter = 5  # (default=100 takes ages)
+        opt_method = "diff_evo_V20"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_IT-Ren_FLUXNET2015_FULLSET_1998-2013_1-4"
-        single_year = True  # True for local testing, default=False
-        year_to_plot = 2012
+        folder = "FLX_IT-MBo_FLUXNET2015_FULLSET_2003-2013_1-4"
+        single_year = False  # True for local testing, default=False
+        year_to_plot = 2006
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
@@ -295,6 +308,20 @@ def main():
         )
         return 1 - results
 
+    def objective_function_pmodel_subdaily(params):
+        (days_memory, window_center, half_width) = params
+        # find best value for memory effect in pmodel
+        GPP_optimized = pModel_subdaily(
+            df_year, int(days_memory), int(window_center), int(half_width)
+        )
+        mask = ~np.isnan(df_year[gpp])
+        results = calculate_NNSE_randunc(
+            df_year[gpp][mask].to_list(),
+            np.array(GPP_optimized)[mask],
+            df_year[randunc][mask],
+        )
+        return 1 - results
+
     # def get_Topt_per_site(df_site):
     #     # Clean the data
     #     df_site["TA_F"] = df_site["TA_F"].replace(-9999.0, np.nan)
@@ -381,10 +408,10 @@ def main():
     timestamp = "TIMESTAMP_START"
     t_air = "TA_F"  # Air temperature, consolidated from TA_F_MDS and TA_ERA
     gpp = (
-        "GPP_NT_" + XUT + "_USTAR50"
+        "GPP_DT_" + XUT + "_USTAR50"
     )  # Gross Primary Production, from Daytime partitioning method, reference selected from GPP versions using model efficiency (MEF).
     r_eco = (
-        "RECO_NT_" + XUT + "_USTAR50"
+        "RECO_DT_" + XUT + "_USTAR50"
     )  # is just used for plotting and R2 out of interest
     nee = (
         "NEE_" + XUT + "_USTAR50"
@@ -453,14 +480,16 @@ def main():
     # Calculate the rolling mean for the past 7 days (not centered)
     df_site["P_avrg"] = df_site["P"].rolling(window="7D", center=False).mean()
     initial_mean = df_site["P"].iloc[: 7 * 48].mean()
-    df_site["P_avrg"].iloc[: 7 * 48] = (
+    df_site.iloc[: 7 * 48, df_site.columns.get_loc("P_avrg")] = (
         df_site["P_avrg"].iloc[: 7 * 48].fillna(initial_mean)
     )
     df_site["P_avrg"] = df_site["P_avrg"].fillna(0)
 
     df_site["GPP_avrg"] = df_site[gpp].rolling(window="1D", center=False).mean()
     initial_mean = df_site[gpp].iloc[:48].mean()
-    df_site["GPP_avrg"].iloc[:48] = df_site["GPP_avrg"].iloc[:48].fillna(initial_mean)
+    df_site.iloc[: 7 * 48, df_site.columns.get_loc("GPP_avrg")] = (
+        df_site["GPP_avrg"].iloc[: 7 * 48].fillna(initial_mean)
+    )
     df_site["GPP_avrg"] = df_site["GPP_avrg"].fillna(0)
 
     ##################################### read  MODIS data ##################################
@@ -495,9 +524,9 @@ def main():
         if column.endswith("_x"):
             base_column = column[:-2]  # Remove suffix '_x'
             if base_column + "_y" in df_modis.columns:
-                df_modis[column].fillna(df_modis[base_column + "_y"], inplace=True)
-                df_modis.drop(columns=[base_column + "_y"], inplace=True)
-                df_modis.rename(columns={column: base_column}, inplace=True)
+                df_modis[column] = df_modis[column].fillna(df_modis[base_column + "_y"])
+                df_modis = df_modis.drop(columns=[base_column + "_y"])
+                df_modis = df_modis.rename(columns={column: base_column})
 
     df_modis.sort_values(by="calendar_date", inplace=True)
     df_modis.reset_index(drop=True, inplace=True)
@@ -507,9 +536,9 @@ def main():
     df_modis.loc[df_modis["sur_refl_b02"] < 0, "sur_refl_b02"] = np.nan
     df_modis.loc[df_modis["sur_refl_b06"] < 0, "sur_refl_b06"] = np.nan
     df_modis["250m_16_days_EVI"] = df_modis["250m_16_days_EVI"]
-    df_modis_intp = df_modis.resample("30T").interpolate(
+    df_modis_intp = df_modis.resample("30min").interpolate(
         method="linear"
-    )  # TODO: create 30 min timeseries here
+    )  # creates 30 min timeseries
     df_modis_intp.reset_index(inplace=True)
     df_modis_intp.rename(columns={"calendar_date": timestamp}, inplace=True)
     df_modis_intp.set_index(timestamp, inplace=True)
@@ -887,16 +916,23 @@ def main():
             VEGFRA,
         )
         df_site_and_modis["GPP_first_guess"] = GPP_VPRM
-        if (
-            folder == "FLX_IT-Tor_FLUXNET2015_FULLSET_2008-2014_2-4"
-        ):  # cut values for plotting
-            df_site_and_modis.loc[
-                df_site_and_modis["GPP_first_guess"] > 30, "GPP_first_guess"
-            ] = np.nan
         df_site_and_modis["Reco_first_guess"] = Reco_VPRM
     elif CO2_parametrization == "migli":
-        # there is no first guess for the pModel
-        df_site_and_modis["GPP_first_guess"] = np.nan
+        # first guess for the pModel with default settings for days_memory, window_center and half_width
+        # df_site_and_modis = df_site_and_modis.dropna()
+        # df_site_and_modis.reset_index(drop=True, inplace=True)
+        try:
+            df_site_and_modis_copy = df_site_and_modis.copy()
+            # fillna with 0
+            df_site_and_modis_copy = df_site_and_modis_copy.fillna(0)
+            df_site_and_modis["GPP_first_guess"] = pModel_subdaily(
+                df_site_and_modis_copy, 15, 12, 30
+            )
+            del df_site_and_modis_copy
+        except:
+            df_site_and_modis["GPP_first_guess"] = np.nan
+            print(f"Error in pModel GPP_first_guess for {site_name} ")
+
         # get first guess of migli
         T_ref = 288.15
         T0 = 227.13
@@ -907,7 +943,7 @@ def main():
             df_site_and_modis[lai_column].quantile(0.95)
             * 1000  # TODO: use correct scale 0.1 directly, now its scale from LSWI*1000=0.1
         )
-        max_lai = float(max_lai)
+        max_lai = float(max_lai.iloc[0])
         df_site_and_modis["Reco_first_guess"] = migliavacca_LinGPP(
             T_ref,
             T0,
@@ -957,27 +993,34 @@ def main():
     Topt = T_opt[target_pft]
     # for year in range(start_year, start_year + 3):  # TODO: set years here manually
     for year in range(start_year, end_year):
+        print(f"processing {year} for {site_name}")
         # Filter data for the current year
         df_year = df_site_and_modis[
             df_site_and_modis[timestamp].dt.year == year
         ].reset_index(drop=True)
+        # Fill missing PPFD values with SW_IN_F approximation
+        mask_ppfd = df_year["PPFD_IN"].isnull()
+        df_year.loc[mask_ppfd, "PPFD_IN"] = (
+            df_year.loc[mask_ppfd, "SW_IN_F"] * 0.50 * 4.6
+        )  # Shortwave radiation (W/m²) × 0.50 -> PAR (W/m²) × 4.6 -> PPFD (umol/m²/s)
 
-        # nan_values = df_year.isna()
-        # nan_sum = nan_values.sum()
-        # full_year = len(df_year)
-        # df_year = df_year.dropna()
-        # df_year.reset_index(drop=True, inplace=True)
+        df_year_copy = df_year.copy()
+        df_year_copy = df_year_copy.drop(columns=[randunc])
 
-        # if nan_sum.any():
-        #     print(
-        #         f"WARNING: There are {(nan_sum).max()} NaN values dropped from df_site_and_modis DataFrame"
-        #     )
-        #     percent_nan = nan_sum.max() / full_year * 100
-        #     if percent_nan > 20:
-        #         print(
-        #             f"WARNING: The year {year} is skipped, as {percent_nan}% values are missing"
-        #         )
-        #         continue
+        nan_values = df_year_copy.isna()
+        nan_sum = nan_values.sum()
+        full_year = len(df_year_copy)
+        df_year_copy = df_year_copy.dropna()
+        df_year_copy.reset_index(drop=True, inplace=True)
+
+        percent_nan = nan_sum.max() / full_year * 100
+        #  find the name of the column with the most missing values
+        column_name = nan_sum.idxmax()
+        if percent_nan > 20:
+            print(
+                f"WARNING: {year} is skipped, as {percent_nan:2.1f}% of {column_name} values are missing"
+            )
+            continue
 
         # Extract relevant columns
         T2M = df_year[t_air].reset_index(drop=True)
@@ -1105,6 +1148,29 @@ def main():
             ]
         ########################## optimize Reco with LinGPP ######################
         elif CO2_parametrization == "migli":
+            bounds_pmodel = [
+                (2, 180),  # Bounds days_memory
+                (9, 17),  # Bounds for window_center
+                (10, 240),  # Bounds for half_width
+            ]
+
+            result = differential_evolution(
+                objective_function_pmodel_subdaily,
+                bounds_pmodel,
+                maxiter=maxiter,
+                integrality=(0, 1, 1),  # Forces all three parameters to be integers
+                disp=True,
+            )
+            (days_memory, window_center, half_width) = result.x
+
+            # result = shgo(
+            #     objective_function_pmodel_subdaily,
+            #     bounds=bounds_pmodel,
+            #     iters=maxiter,
+            # )
+
+            days_memory, window_center, half_width = map(int, result.x)
+
             boundaries = {
                 "ENF": {
                     "RLAI": (1.02, 0),
@@ -1226,7 +1292,10 @@ def main():
             )
         elif CO2_parametrization == "migli":
             # TODO: there are no parameters but can we find settings to optimize?
-            GPP_optimized = pModel_subdaily(df_site_and_modis)
+            GPP_optimized = pModel_subdaily(
+                df_year, days_memory, int(window_center), int(half_width)
+            )
+            GPP_optimized = GPP_optimized.tolist()
 
             Reco_optimized = migliavacca_LinGPP(
                 T_ref,
@@ -1396,6 +1465,9 @@ def main():
                     "PFT": [target_pft],
                     "Year": [year],
                     "Topt": [Topt],
+                    "days_memory": days_memory,
+                    "window_center": window_center,
+                    "half_width": half_width,
                     "RLAI": [R_lai0],
                     "alphaLAI": [alpha_lai],
                     "k2": [k2],
@@ -1430,6 +1502,7 @@ def main():
             )
 
         print(data_to_append)
+
         optimized_params_df = pd.concat(
             [optimized_params_df, data_to_append], ignore_index=True
         )
