@@ -1158,16 +1158,10 @@ def main():
                 objective_function_pmodel_subdaily,
                 bounds_pmodel,
                 maxiter=maxiter,
-                integrality=(0, 1, 1),  # Forces all three parameters to be integers
+                integrality=(0, 1, 1),  # Forces parameters to be integers
                 disp=True,
             )
             (days_memory, window_center, half_width) = result.x
-
-            # result = shgo(
-            #     objective_function_pmodel_subdaily,
-            #     bounds=bounds_pmodel,
-            #     iters=maxiter,
-            # )
 
             days_memory, window_center, half_width = map(int, result.x)
 
