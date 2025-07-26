@@ -154,16 +154,16 @@ def main():
         opt_method = args.opt_method
         CO2_parametrization = args.CO2_parametrization
         folder = args.folder
-        single_year = False  # set true to run only one year. For 2012 there are specific Topt values for chosen sites.
-        year_to_plot = 2000
+        single_year = True  # set true to run only one year. For 2012 there are specific Topt values for chosen sites.
+        year_to_plot = 2012
     else:  # to run locally for single cases
         base_path = "/scratch/c7071034/DATA/Fluxnet2015/Alps/"
         maxiter = 5  # (default=100 takes ages)
         opt_method = "diff_evo_V20"  # version of diff evo
         CO2_parametrization = "migli"  # "old","new", "migli"
-        folder = "FLX_IT-MBo_FLUXNET2015_FULLSET_2003-2013_1-4"
-        single_year = False  # True for local testing, default=False
-        year_to_plot = 2006
+        folder = "FLX_IT-Ren_FLUXNET2015_FULLSET_1998-2013_1-4"
+        single_year = True  # True for local testing, default=False
+        year_to_plot = 2012
 
     VEGFRA = 1  # not applied for EC measurements, set to 1
     site_info = pd.read_csv(base_path + "site_info_all_FLUXNET2015.csv")
