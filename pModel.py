@@ -29,9 +29,28 @@ def pModel_subdaily(
     co2_subdaily = df_site_and_modis.loc[:, "CO2_F_MDS"]
     patm_subdaily = df_site_and_modis.loc[:, "PA_F"] * 1000
     fpar_subdaily = df_site_and_modis.loc[:, "Fpar_500m"] * 100
+    datetime_subdaily = pd.to_datetime(df_site_and_modis["TIMESTAMP_START"]).to_numpy()
 
-    # Prepare subdaily environment
-    subdaily_env = PModelEnvironment(
+    # # Setup acclimation model
+    # acclim_model = AcclimationModel(
+    #     datetime_subdaily, allow_holdover=True, alpha=1 / days_memory
+    # )
+    # acclim_model.set_window(
+    #     window_center=np.timedelta64(window_center_i, "h"),
+    #     half_width=np.timedelta64(half_width_i, "m"),
+    # )
+
+    # Create the acclimation model - merging acclimation functions into a common class
+    acclim_model = AcclimationModel(
+        datetime_subdaily, alpha=1 / 15, allow_holdover=True
+    )
+    acclim_model.set_window(
+        window_center=np.timedelta64(12, "h"),
+        half_width=np.timedelta64(1, "h"),
+    )
+
+    # Create the PModelEnvironment, including FAPAR and PPFD
+    pm_env = PModelEnvironment(
         tc=temp_subdaily.values,
         vpd=vpd_subdaily.values,
         co2=co2_subdaily.values,
@@ -40,22 +59,18 @@ def pModel_subdaily(
         fapar=fpar_subdaily.values,
     )
 
-    datetime_subdaily = pd.to_datetime(df_site_and_modis["TIMESTAMP_START"]).to_numpy()
-
-    # Setup acclimation model
-    acclim_model = AcclimationModel(
-        datetime_subdaily, allow_holdover=True, alpha=1 / days_memory
+    # Fit the subdaily model - which now accepts all of the alternative method
+    # arguments  used by the PModel class.
+    subdaily_model = SubdailyPModel(
+        env=pm_env,
+        acclim_model=acclim_model,
+        method_kphio="fixed",
+        method_optchi="prentice14",
+        reference_kphio=1 / 8,  # Again, this is the default.
     )
-    acclim_model.set_window(
-        window_center=np.timedelta64(window_center_i, "h"),
-        half_width=np.timedelta64(half_width_i, "m"),
-    )
+    pmodel_subdaily_gpp = subdaily_model.gpp * gC_to_mumol
 
-    # Fit subdaily P Model with acclimation
-    pmodel_subdaily = SubdailyPModel(env=subdaily_env, acclim_model=acclim_model)
-    pmodel_subdaily_acc = pmodel_subdaily.gpp * gC_to_mumol
-
-    return pmodel_subdaily_acc
+    return pmodel_subdaily_gpp
 
 
 # # From Pyrealm 1.0.0
