@@ -462,7 +462,7 @@ def main():
     df_site.loc[df_site[sw_in] < 0, sw_in] = 0
 
     # Conversion factors
-    PAR_conversion = 0.505  #  global radiation is proportional to PAR (Rg = 0.505*PAR - Mahadevan 2008)
+    PAR_conversion = 1 # 0.505  #  global radiation is proportional to PAR (Rg = 0.505*PAR - Mahadevan 2008)
 
     df_site["PAR"] = df_site[sw_in] / PAR_conversion
     # df_site.drop(columns=[sw_in], inplace=True)
