@@ -131,6 +131,9 @@ def main():
     V18 - T_opt constant again to reduce variation of parameters and to run specific T_opts for certain sites in 2012
     V19 - migli is calculated together with pmodel - pmodel is optimized against memory effect
     V20 - pmodel is optimized also against window_center and half_width
+    V21 - testing for Pmodel
+    V22 - changed to PAR_conversion = 1 only 2012
+    V23 - also PAR_conversion = 1 all years
     """
 
     if len(sys.argv) > 1:  # to run all on cluster with 'submit_jobs_tune_VPRM.sh'
